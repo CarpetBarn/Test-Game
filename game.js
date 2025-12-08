@@ -2,11 +2,11 @@
 // Systems: combat, loot, skills, dragons, events, saving
 
 const rarities = [
-  { key: 'common', label: 'Common', color: 'common', weight: 60, stats: [1, 2], scale: 1 },
-  { key: 'uncommon', label: 'Uncommon', color: 'uncommon', weight: 25, stats: [2, 3], scale: 1.08 },
-  { key: 'rare', label: 'Rare', color: 'rare', weight: 9, stats: [3, 4], scale: 1.2 },
-  { key: 'epic', label: 'Epic', color: 'epic', weight: 4, stats: [4, 5], scale: 1.35 },
-  { key: 'legendary', label: 'Legendary', color: 'legendary', weight: 1, stats: [4, 5], scale: 1.55 },
+  { key: 'common', label: 'Common', color: 'common', weight: 70, stats: [1, 2], scale: 1 },
+  { key: 'uncommon', label: 'Uncommon', color: 'uncommon', weight: 22, stats: [2, 3], scale: 1.08 },
+  { key: 'rare', label: 'Rare', color: 'rare', weight: 6, stats: [3, 4], scale: 1.2 },
+  { key: 'epic', label: 'Epic', color: 'epic', weight: 2, stats: [4, 5], scale: 1.35 },
+  { key: 'legendary', label: 'Legendary', color: 'legendary', weight: 0.5, stats: [4, 5], scale: 1.55 },
 ];
 
 const statPool = [
@@ -225,6 +225,28 @@ const skillTrees = {
   ]
 };
 
+function enrichSkillTrees() {
+  Object.values(skillTrees).forEach(branches => {
+    branches.forEach(branch => {
+      for (let i = 1; i <= 10; i++) {
+        branch.skills.push({
+          name: `${branch.branch} Mastery ${i}`,
+          cost: 1,
+          desc: `+${2 + i}% mixed stats from ${branch.branch}`,
+          effect: (p) => {
+            p.modifiers.attack += 0.005 * (2 + i);
+            p.modifiers.hp += 0.005 * (2 + i);
+            p.modifiers.defense += 0.003 * (2 + i);
+            p.modifiers.crit += 0.002 * (2 + i);
+          },
+        });
+      }
+    });
+  });
+}
+
+enrichSkillTrees();
+
 const state = {
   player: null,
   inventory: [],
@@ -236,6 +258,7 @@ const state = {
   log: [],
   shop: [],
   filters: { slot: 'all', rarity: 'all', type: 'all' },
+  prestige: 0,
 };
 
 function createPlayer(cls) {
@@ -299,6 +322,7 @@ function generateItem(level, isBoss = false) {
 }
 
 function applyBonuses(baseStats, player) {
+  const prestigeBonus = 1 + (state.prestige || 0) * 0.03;
   const gearStats = { hp: 0, attack: 0, defense: 0, crit: 0, critdmg: 0, speed: 0, elemental: 0 };
   Object.values(player.equipment).forEach(item => {
     if (!item) return;
@@ -307,10 +331,10 @@ function applyBonuses(baseStats, player) {
   const dragonFactor = 1 + (player.modifiers.dragonBond || 0);
   const dragonStats = state.activeDragon ? Object.fromEntries(Object.entries(state.activeDragon.bonus).map(([k, v]) => [k, Math.round(v * dragonFactor)])) : {};
   return {
-    maxHP: Math.round((baseStats.hp + (gearStats.hp || 0) + (dragonStats.hp || 0) + (player.flat.hp || 0)) * (1 + player.modifiers.hp)),
-    attack: Math.round((baseStats.attack + (gearStats.attack || 0) + (dragonStats.attack || 0) + (player.flat.attack || 0)) * (1 + player.modifiers.attack)) + (player.flat.elemental || 0) + (dragonStats.elemental || 0),
-    defense: Math.round((baseStats.defense + (gearStats.defense || 0) + (dragonStats.defense || 0)) * (1 + player.modifiers.defense)),
-    crit: (baseStats.crit + (gearStats.crit || 0) + (dragonStats.crit || 0)) * (1 + player.modifiers.crit),
+    maxHP: Math.round((baseStats.hp + (gearStats.hp || 0) + (dragonStats.hp || 0) + (player.flat.hp || 0)) * (1 + player.modifiers.hp) * prestigeBonus),
+    attack: Math.round((baseStats.attack + (gearStats.attack || 0) + (dragonStats.attack || 0) + (player.flat.attack || 0)) * (1 + player.modifiers.attack) * prestigeBonus) + (player.flat.elemental || 0) + (dragonStats.elemental || 0),
+    defense: Math.round((baseStats.defense + (gearStats.defense || 0) + (dragonStats.defense || 0)) * (1 + player.modifiers.defense) * prestigeBonus),
+    crit: (baseStats.crit + (gearStats.crit || 0) + (dragonStats.crit || 0)) * (1 + player.modifiers.crit) * prestigeBonus,
     critdmg: 1.5 + (gearStats.critdmg || 0) / 100 + player.modifiers.critdmg + (dragonStats.critdmg || 0),
     speed: (baseStats.speed || 0) + (gearStats.speed || 0) + (player.flat.speed || 0) + (dragonStats.speed || 0),
     elemental: (gearStats.elemental || 0) + (dragonStats.elemental || 0),
@@ -319,7 +343,9 @@ function applyBonuses(baseStats, player) {
 
 function pickEnemy(zone, boss = false) {
   const choice = boss ? zone.boss : zone.enemies[Math.floor(Math.random() * zone.enemies.length)];
-  return { ...choice, currentHP: choice.hp };
+  const scaledHP = Math.round(choice.hp * 2);
+  const scaledAttack = Math.round(choice.attack * 2);
+  return { ...choice, hp: scaledHP, attack: scaledAttack, currentHP: scaledHP };
 }
 
 function logMessage(msg) {
@@ -330,10 +356,25 @@ function logMessage(msg) {
 
 function startFight(boss = false) {
   const zone = zones[state.currentZone];
-  state.currentEnemy = pickEnemy(zone, boss);
-  document.getElementById('enemy-display').textContent = `${state.currentEnemy.name} (Lv ${zone.level}${boss ? ' Boss' : ''})`;
+  const bossLevelLock = zone.level + 2;
+  let bossFight = boss;
+  if (bossFight && state.player.level < bossLevelLock) {
+    logMessage(`Boss locked until level ${bossLevelLock}. Keep leveling!`);
+    return;
+  }
+  if (!bossFight && state.player.level >= bossLevelLock && Math.random() < 0.2) {
+    bossFight = true;
+    logMessage('A roaming boss challenges you!');
+  }
+  if (bossFight && Math.random() < 0.35) {
+    // Even when hunting for bosses, it remains a random roll.
+    bossFight = false;
+    logMessage('No boss this time—regular foes appear.');
+  }
+  state.currentEnemy = pickEnemy(zone, bossFight);
+  document.getElementById('enemy-display').textContent = `${state.currentEnemy.name} (Lv ${zone.level}${bossFight ? ' Boss' : ''})`;
   updateBars();
-  runCombat(boss);
+  runCombat(bossFight);
 }
 
 function autoBattle(boss = false) {
@@ -417,7 +458,7 @@ function finishCombat(victory, boss) {
   const zone = zones[state.currentZone];
   if (victory) {
     const xpBoost = 1 + (player.modifiers.xpBoost || 0);
-    const xpGain = Math.round(state.currentEnemy.xp * xpBoost);
+    const xpGain = Math.max(1, Math.round(state.currentEnemy.xp * (1/3) * xpBoost));
     const goldGain = Math.round(state.currentEnemy.gold * (1 + (player.modifiers.goldBoost || 0)));
     player.xp += xpGain;
     player.gold += goldGain;
@@ -494,7 +535,14 @@ function createEgg(boss) {
 }
 
 function createPotion(level) {
-  return { id: crypto.randomUUID(), type: 'potion', name: 'Healing Brew', rarity: 'uncommon', heal: 30 + level * 6, price: 20 + level * 4 };
+  const variants = [
+    { name: 'Herbal Remedy', rarity: 'common', base: 20, scale: 4 },
+    { name: 'Healing Brew', rarity: 'uncommon', base: 30, scale: 6 },
+    { name: 'Greater Elixir', rarity: 'rare', base: 50, scale: 8 },
+    { name: 'Vital Surge Draught', rarity: 'epic', base: 80, scale: 10 },
+  ];
+  const choice = variants[Math.floor(Math.random() * variants.length)];
+  return { id: crypto.randomUUID(), type: 'potion', name: choice.name, rarity: choice.rarity, heal: choice.base + level * choice.scale, price: 15 + level * 5 + choice.scale };
 }
 
 function hatchProgress() {
@@ -568,9 +616,25 @@ function randomEvent() {
         { text: 'Offer gold (20)', resolve: () => { if (state.player.gold >= 20) { state.player.gold -= 20; const egg = createEgg(false); state.eggs.push(egg); return 'A mysterious egg appears in your pack.'; } return 'You lack the gold.'; } },
         { text: 'Meditate', resolve: () => { state.player.modifiers.eggBoost += 0.02; return 'You feel more attuned to dragon eggs.'; } }
       ]
+    },
+    {
+      title: 'Lost Alchemist',
+      desc: 'A wandering alchemist offers potent brews.',
+      options: [
+        { text: 'Buy tonic (20g)', resolve: () => { if (state.player.gold >= 20) { state.player.gold -= 20; state.inventory.push(createPotion(state.player.level + 2)); return 'You purchase a strong tonic.'; } return 'Not enough gold.'; } },
+        { text: 'Trade knowledge', resolve: () => { state.player.skillPoints += 1; return 'You learn a new trick (skill point gained).'; } }
+      ]
+    },
+    {
+      title: 'Forgotten Forge',
+      desc: 'A broken anvil hums with power.',
+      options: [
+        { text: 'Reforge gear', resolve: () => { if (state.inventory.length) { const item = state.inventory[Math.floor(Math.random() * state.inventory.length)]; item.power += 5; return `${item.name} feels sturdier.`; } return 'No gear to reforge.'; } },
+        { text: 'Salvage spark', resolve: () => { state.player.modifiers.attack += 0.03; return 'Your strikes feel sharper (+3% attack).'; } }
+      ]
     }
   ];
-  if (Math.random() < 0.13) {
+  if (Math.random() < 0.043) {
     const ev = events[Math.floor(Math.random() * events.length)];
     renderEvent(ev);
   } else {
@@ -602,9 +666,11 @@ function generateShop() {
     item.price = Math.max(30, item.power * 3);
     state.shop.push(item);
   }
-  const potion = createPotion(level);
-  potion.price = Math.max(potion.price, 25);
-  state.shop.push(potion);
+  for (let i = 0; i < 2; i++) {
+    const potion = createPotion(level + i);
+    potion.price = Math.max(potion.price, 20 + i * 5);
+    state.shop.push(potion);
+  }
   const egg = createEgg(false);
   egg.type = 'egg';
   egg.price = valueFromEgg(egg) * 2;
@@ -706,13 +772,7 @@ function renderInventory() {
   const wrap = document.getElementById('inventory-list');
   if (!state.inventory.length) { wrap.innerHTML = '<div class="small">No items yet.</div>'; return; }
   wrap.innerHTML = '';
-  const filtered = state.inventory.filter(item => {
-    const type = item.type || 'gear';
-    if (state.filters.type !== 'all' && type !== state.filters.type) return false;
-    if (state.filters.slot !== 'all' && item.slot !== state.filters.slot) return false;
-    if (state.filters.rarity !== 'all' && item.rarity !== state.filters.rarity) return false;
-    return true;
-  });
+  const filtered = filteredInventoryItems();
   if (!filtered.length) { wrap.innerHTML = '<div class="small">No items match the filters.</div>'; return; }
   filtered.forEach(item => {
     const card = document.createElement('div');
@@ -731,7 +791,9 @@ function renderInventory() {
       row.appendChild(sellBtn);
       card.appendChild(row);
     } else {
-      card.innerHTML = `<div class="name ${item.rarity}">${item.name}</div><div class="small">Requires Lv ${item.levelReq} • Slot: ${item.slot}</div><div class="small">Power ${item.power}</div>`;
+      const better = isBetterThanEquipped(item);
+      const arrow = better ? '<span class="better-arrow">↑</span>' : '';
+      card.innerHTML = `<div class="name ${item.rarity}">${item.name}${arrow}</div><div class="small">Requires Lv ${item.levelReq} • Slot: ${item.slot}</div><div class="small">Power ${item.power}</div>`;
       (item.stats || []).forEach(s => {
         const stat = document.createElement('div');
         stat.className = 'small';
@@ -755,7 +817,37 @@ function renderInventory() {
 
 function valueFromItem(item) {
   if (item.type === 'potion') return Math.max(5, Math.round(item.price * 0.5));
+  if (item.type === 'egg') return valueFromEgg(item);
   return Math.max(5, Math.round((item.power || 5) * 1.5));
+}
+
+function filteredInventoryItems() {
+  return state.inventory.filter(item => {
+    const type = item.type || 'gear';
+    if (state.filters.type !== 'all' && type !== state.filters.type) return false;
+    if (state.filters.slot !== 'all' && item.slot !== state.filters.slot) return false;
+    if (state.filters.rarity !== 'all' && item.rarity !== state.filters.rarity) return false;
+    return true;
+  });
+}
+
+function sellFiltered() {
+  const filtered = filteredInventoryItems();
+  if (!filtered.length) { logMessage('No items to sell for current filters.'); return; }
+  let total = 0;
+  filtered.forEach(item => { total += valueFromItem(item); });
+  const ids = new Set(filtered.map(i => i.id));
+  state.inventory = state.inventory.filter(i => !ids.has(i.id));
+  state.player.gold += total;
+  logMessage(`Sold ${filtered.length} items for ${total} gold.`);
+  updateAll();
+}
+
+function isBetterThanEquipped(item) {
+  if (item.type !== 'gear') return false;
+  const current = state.player.equipment[item.slot];
+  if (!current) return true;
+  return item.power > current.power;
 }
 
 function sellItem(item) {
@@ -903,6 +995,7 @@ function renderTopbar() {
   document.getElementById('player-level').textContent = `Level ${p.level}`;
   document.getElementById('player-gold').textContent = `${p.gold} gold`;
   document.getElementById('player-dragon').textContent = state.activeDragon ? `Dragon: ${state.activeDragon.name}` : 'No dragon';
+  document.getElementById('player-prestige').textContent = `Prestige ${state.prestige || 0}`;
   const hpPct = Math.max(0, Math.min(1, p.currentHP / derived.maxHP));
   document.getElementById('hp-bar').style.width = `${hpPct * 100}%`;
   document.getElementById('hp-text').textContent = `${p.currentHP}/${derived.maxHP} HP`;
@@ -930,6 +1023,37 @@ function updateAll() {
   saveGame();
 }
 
+function prestige() {
+  if (!state.player) return;
+  if (state.player.level < 20) { logMessage('Reach level 20 to prestige.'); return; }
+  state.prestige = (state.prestige || 0) + 1;
+  const cls = state.player.class;
+  state.player = createPlayer(cls);
+  state.inventory = [];
+  state.eggs = [];
+  state.activeDragon = null;
+  state.unlockedZones = 1;
+  state.currentZone = 0;
+  logMessage(`You prestiged! Permanent bonus applied (x${state.prestige}).`);
+  updateAll();
+}
+
+function resetGame() {
+  localStorage.removeItem('rpgSave');
+  state.player = null;
+  state.inventory = [];
+  state.eggs = [];
+  state.activeDragon = null;
+  state.currentZone = 0;
+  state.unlockedZones = 1;
+  state.currentEnemy = null;
+  state.log = [];
+  state.shop = [];
+  state.prestige = 0;
+  document.getElementById('class-select').style.display = 'flex';
+  setupClassSelection();
+}
+
 function saveGame() {
   const data = {
     player: state.player,
@@ -939,6 +1063,7 @@ function saveGame() {
     currentZone: state.currentZone,
     unlockedZones: state.unlockedZones,
     shop: state.shop,
+    prestige: state.prestige,
   };
   localStorage.setItem('rpgSave', JSON.stringify(data));
 }
@@ -956,6 +1081,7 @@ function loadGame() {
     state.currentZone = parsed.currentZone || 0;
     state.unlockedZones = parsed.unlockedZones || 1;
     state.shop = parsed.shop || [];
+    state.prestige = parsed.prestige || 0;
     return true;
   }
   return false;
@@ -981,7 +1107,7 @@ function initGame() {
   renderTabs();
   renderZones();
   document.getElementById('fight-btn').onclick = () => startFight(false);
-  document.getElementById('boss-btn').onclick = () => startFight(true);
+  document.getElementById('boss-btn').onclick = () => logMessage('Bosses appear randomly once you meet the level lock. Keep fighting!');
   document.getElementById('auto-btn').onclick = () => autoBattle(false);
   document.getElementById('refresh-shop').onclick = () => { generateShop(); renderShop(); saveGame(); };
   ['slot','rarity','type'].forEach(key => {
@@ -991,6 +1117,9 @@ function initGame() {
       saveGame();
     });
   });
+  document.getElementById('sell-filtered').onclick = sellFiltered;
+  document.getElementById('reset-btn').onclick = resetGame;
+  document.getElementById('prestige-btn').onclick = prestige;
   if (!state.shop.length) generateShop();
   updateAll();
 }
