@@ -19,7 +19,14 @@
       <span id="player-name">Adventurer</span> • <span id="player-class"></span>
     </div>
     <div class="bars">
-      <div class="bar"><div id="hp-bar" class="fill"></div><span id="hp-text"></span></div>
+      <div class="bar"><div id="hp-bar" class="fill hp-bar-fill"></div><span id="hp-text"></span></div>
+      <div id="rage-container" class="resource-bar-container">
+        <div class="resource-label">Rage</div>
+        <div class="resource-bar rage-bar">
+          <div id="player-rage-bar" class="resource-bar-fill rage-bar-fill"></div>
+        </div>
+        <div id="player-rage-text" class="resource-text">0 / 100</div>
+      </div>
       <div class="bar mana"><div id="resource-bar" class="fill"></div><span id="resource-text"></span></div>
       <div class="bar xp"><div id="xp-bar" class="fill"></div><span id="xp-text"></span></div>
     </div>

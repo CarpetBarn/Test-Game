@@ -476,6 +476,8 @@ function createPlayer(cls) {
     },
     flat: { speed: 0, elemental: 0, hp: 0, attack: 0 },
     currentHP: base.hp,
+    rage: 0,
+    maxRage: 100,
     maxResource: base.mana,
     currentResource: base.mana,
   };
@@ -488,6 +490,8 @@ function ensureModifierDefaults(player) {
   player.flat = { speed: 0, elemental: 0, hp: 0, attack: 0, ...(player.flat || {}) };
   player.maxResource = player.maxResource || player.baseStats.mana || 30;
   player.currentResource = player.currentResource || player.maxResource;
+  player.maxRage = player.maxRage || 100;
+  player.rage = Math.min(player.maxRage, Math.max(0, player.rage || 0));
 }
 
 function defaultLifeSkills() {
@@ -504,6 +508,49 @@ function ensureLifeSkills() {
     if (!state.lifeSkills[k]) state.lifeSkills[k] = { level: 1, currentXP: 0, xpToNext: 50 };
   });
   materialTemplates.forEach(mat => { if (!state.materials[mat]) state.materials[mat] = 0; });
+}
+
+const playerHpBar = document.getElementById('hp-bar');
+const playerHpText = document.getElementById('hp-text');
+const enemyHpBar = document.getElementById('enemy-hp');
+const enemyHpText = document.getElementById('enemy-hp-text');
+const playerRageBar = document.getElementById('player-rage-bar');
+const playerRageText = document.getElementById('player-rage-text');
+const rageContainer = document.getElementById('rage-container');
+
+function usesRage(player = state.player) {
+  return player && classResources[player.class] === 'Rage';
+}
+
+function updateHealthBar(entity, barElement, textElement, maxOverride) {
+  if (!entity || !barElement) return;
+  const max = maxOverride || entity.maxHP || 1;
+  const percent = Math.max(0, Math.min(100, (entity.currentHP / max) * 100));
+  barElement.style.width = `${percent}%`;
+  if (textElement) {
+    textElement.textContent = `${Math.max(0, Math.floor(entity.currentHP))} / ${Math.max(1, Math.floor(max))}`;
+  }
+}
+
+function updateRageBar(player) {
+  if (!player || !playerRageBar) return;
+  const percent = Math.max(0, Math.min(100, (player.rage / player.maxRage) * 100));
+  playerRageBar.style.width = `${percent}%`;
+  if (playerRageText) playerRageText.textContent = `${Math.floor(player.rage)} / ${player.maxRage}`;
+}
+
+function addRage(amount) {
+  if (!usesRage()) return;
+  state.player.rage = Math.max(0, Math.min(state.player.maxRage, state.player.rage + amount));
+  updateRageBar(state.player);
+}
+
+function spendRage(amount) {
+  if (!usesRage()) return true;
+  if (state.player.rage < amount) return false;
+  state.player.rage = Math.max(0, state.player.rage - amount);
+  updateRageBar(state.player);
+  return true;
 }
 
 function weightedRarity(isBoss) {
@@ -591,6 +638,9 @@ function logMessage(msg, css) {
 const CombatSystem = {
   active: false,
   battle: null,
+  usesRageResource() {
+    return usesRage(this.battle?.player);
+  },
   startBattle({ player, enemy, isBoss, zone, zoneMod, auto }) {
     ensureModifierDefaults(player);
     this.active = true;
@@ -607,7 +657,9 @@ const CombatSystem = {
       skillCooldowns: {},
     };
     this.turn = 'player';
-    player.currentResource = player.maxResource;
+    const rageMode = this.usesRageResource();
+    player.currentResource = rageMode ? 0 : player.maxResource;
+    player.rage = rageMode ? 0 : player.rage;
     logMessage(`Battle start against ${enemy.name}${isBoss ? ' (Boss)' : ''}.`);
     const playerSpeed = this.computePlayerStats().speed || 10;
     const enemySpeed = this.computeEnemyStats().speed || 10;
@@ -618,8 +670,13 @@ const CombatSystem = {
     updateBars();
     this.renderSkillButtons();
     this.updateStatusUI();
+    renderTopbar();
     this.updateActionButtons();
-    this.beginTurn(this.turn || 'player');
+    if (auto) {
+      this.resolveAutoBattle();
+    } else {
+      this.beginTurn(this.turn || 'player');
+    }
   },
   beginTurn(side) {
     if (!this.active) return;
@@ -653,7 +710,11 @@ const CombatSystem = {
       logMessage(`${target === 'player' ? 'The zone harms you' : 'The zone harms the foe'} for ${this.battle.zoneMod.dot}.`, 'status');
     }
     if (target === 'player') {
-      entity.currentResource = Math.min(entity.maxResource, entity.currentResource + 3);
+      if (this.usesRageResource()) {
+        addRage(5);
+      } else {
+        entity.currentResource = Math.min(entity.maxResource, entity.currentResource + 3);
+      }
     }
     statuses.forEach(s => {
       if (s.type === 'dot' && s.tick) {
@@ -683,16 +744,20 @@ const CombatSystem = {
       this.playerAction('attack');
     }
   },
-  playerAction(type, skillId) {
-    if (!this.active || this.turn !== 'player') return;
+  handlePlayerAction(type, skillId) {
     const playerStats = this.computePlayerStats();
     const enemyStats = this.computeEnemyStats();
     if (type === 'skill') {
       const skill = activeSkills[this.battle.player.class].find(s => s.id === skillId);
-      if (!this.canUseSkill(skill)) return;
-      this.battle.player.currentResource -= skill.cost;
+      if (!this.canUseSkill(skill)) return false;
+      if (this.usesRageResource()) {
+        if (!spendRage(skill.cost)) return false;
+      } else {
+        this.battle.player.currentResource -= skill.cost;
+      }
       this.battle.skillCooldowns[skill.id] = skill.cooldown;
       skill.action({ player: this.battle.player, enemy: this.battle.enemy, playerStats, enemyStats, isBoss: this.battle.isBoss });
+      if (this.usesRageResource()) addRage(4);
     } else {
       const dmg = this.calculateDamage(playerStats, enemyStats, { variance: 0.1, bonus: 1 });
       this.battle.enemy.currentHP -= dmg.amount;
@@ -705,7 +770,15 @@ const CombatSystem = {
         const tick = Math.round(playerStats.attack * this.battle.player.modifiers.bleed);
         this.applyStatus('enemy', { key: 'bleed', duration: 2, tick, type: 'dot', label: 'Bleed' });
       }
+      if (this.usesRageResource()) addRage(Math.max(3, Math.round(dmg.amount * 0.1)));
     }
+    updateBars();
+    return true;
+  },
+  playerAction(type, skillId) {
+    if (!this.active || this.turn !== 'player') return;
+    const acted = this.handlePlayerAction(type, skillId);
+    if (!acted) return;
     if (this.checkVictory()) return;
     this.endPlayerTurn();
   },
@@ -735,6 +808,7 @@ const CombatSystem = {
         if (this.battle.isBoss && player.modifiers.bossResist) taken = Math.round(taken * (1 - player.modifiers.bossResist));
         player.currentHP -= taken;
         logMessage(`${this.battle.enemy.name} hits you for ${taken}${dmg.crit ? ' (CRIT)' : ''}.`);
+        if (this.usesRageResource()) addRage(Math.max(2, Math.round(taken * 0.08)));
         if (player.modifiers.thorns) {
           const reflect = Math.max(1, Math.round(taken * player.modifiers.thorns));
           this.battle.enemy.currentHP -= reflect;
@@ -757,6 +831,63 @@ const CombatSystem = {
     this.updateActionButtons();
     if (this.checkVictory()) return;
     if (this.battle.auto) this.autoPlay();
+  },
+  resolveAutoBattle() {
+    let guard = 0;
+    while (this.active && guard < 200) {
+      const playerSkip = this.applyStartOfTurn('player');
+      updateBars();
+      this.updateStatusUI();
+      if (this.checkVictory()) break;
+      if (!playerSkip) {
+        const skill = activeSkills[this.battle.player.class][0];
+        if (this.canUseSkill(skill)) {
+          this.handlePlayerAction('skill', skill.id);
+        } else {
+          this.handlePlayerAction('attack');
+        }
+        if (this.checkVictory()) break;
+      }
+      this.tickCooldowns();
+      const enemySkip = this.applyStartOfTurn('enemy');
+      updateBars();
+      this.updateStatusUI();
+      if (this.checkVictory()) break;
+      if (!enemySkip) {
+        const enemyStats = this.computeEnemyStats();
+        const playerStats = this.computePlayerStats();
+        const player = this.battle.player;
+        const dodgeRoll = Math.random();
+        const dodgeChance = player.modifiers.dodge + (this.hasStatus('player', 'evasion') ? 0.08 : 0);
+        if (dodgeRoll < dodgeChance) {
+          logMessage(`${this.battle.enemy.name} misses as you dodge!`, 'status');
+        } else {
+          const dmg = this.calculateDamage(enemyStats, playerStats, { variance: 0.12, bonus: 1 });
+          let taken = dmg.amount;
+          const barrier = this.totalBarrier('player');
+          if (barrier > 0) taken = Math.max(1, taken - barrier);
+          if (this.battle.isBoss && player.modifiers.bossResist) taken = Math.round(taken * (1 - player.modifiers.bossResist));
+          player.currentHP -= taken;
+          logMessage(`${this.battle.enemy.name} hits you for ${taken}${dmg.crit ? ' (CRIT)' : ''}.`);
+          if (this.usesRageResource()) addRage(Math.max(2, Math.round(taken * 0.08)));
+          if (player.modifiers.thorns) {
+            const reflect = Math.max(1, Math.round(taken * player.modifiers.thorns));
+            this.battle.enemy.currentHP -= reflect;
+            logMessage(`Thorns deal ${reflect} back!`, 'status');
+          }
+          if (player.modifiers.lifesteal) {
+            const heal = Math.round(taken * player.modifiers.lifesteal);
+            player.currentHP = Math.min(playerStats.maxHP, player.currentHP + heal);
+            logMessage(`You steal ${heal} life.`, 'status');
+          }
+        }
+      }
+      updateBars();
+      if (this.checkVictory()) break;
+      guard++;
+    }
+    this.turn = 'player';
+    this.updateActionButtons();
   },
   tickCooldowns() {
     Object.keys(this.battle.skillCooldowns).forEach(id => {
@@ -843,7 +974,9 @@ const CombatSystem = {
   canUseSkill(skill) {
     if (!skill) return false;
     const cd = this.battle.skillCooldowns[skill.id] || 0;
-    return this.battle.player.currentResource >= skill.cost && cd <= 0;
+    if (cd > 0) return false;
+    if (this.usesRageResource()) return this.battle.player.rage >= skill.cost;
+    return this.battle.player.currentResource >= skill.cost;
   },
   updateActionButtons() {
     if (!this.battle) {
@@ -957,7 +1090,12 @@ function finishCombat(result, bossFlag) {
   }
   levelCheck();
   player.currentHP = Math.min(applyBonuses(player.baseStats, player).maxHP, player.currentHP <= 0 ? applyBonuses(player.baseStats, player).maxHP : player.currentHP);
-  player.currentResource = Math.min(player.currentResource + 4, player.maxResource);
+  if (usesRage(player)) {
+    player.rage = Math.max(0, Math.min(player.maxRage, player.rage));
+    updateRageBar(player);
+  } else {
+    player.currentResource = Math.min(player.currentResource + 4, player.maxResource);
+  }
   if (state.foodBuff && state.foodBuff.battles > 0) {
     state.foodBuff.battles -= 1;
     if (state.foodBuff.battles <= 0) logMessage(`${state.foodBuff.source || 'Food buff'} fades.`);
@@ -1712,10 +1850,16 @@ function renderTopbar() {
   document.getElementById('player-gold').textContent = `${p.gold} gold`;
   document.getElementById('player-dragon').textContent = state.activeDragon ? `Dragon: ${state.activeDragon.name}` : 'No dragon';
   document.getElementById('player-prestige').textContent = `Prestige ${state.prestige || 0}`;
-  const hpPct = Math.max(0, Math.min(1, p.currentHP / derived.maxHP));
-  document.getElementById('hp-bar').style.width = `${hpPct * 100}%`;
-  document.getElementById('hp-text').textContent = `${p.currentHP}/${derived.maxHP} HP`;
-  const resPct = Math.max(0, Math.min(1, p.currentResource / p.maxResource));
+  p.currentHP = Math.min(derived.maxHP, Math.max(0, p.currentHP));
+  updateHealthBar(p, playerHpBar, playerHpText, derived.maxHP);
+  const usesRageResource = usesRage(p);
+  const manaBar = document.querySelector('.bar.mana');
+  if (rageContainer) rageContainer.style.display = usesRageResource ? 'block' : 'none';
+  if (manaBar) manaBar.style.display = usesRageResource ? 'none' : 'block';
+  if (usesRageResource) {
+    updateRageBar(p);
+  }
+  const resPct = Math.max(0, Math.min(1, p.currentResource / Math.max(1, p.maxResource)));
   document.getElementById('resource-bar').style.width = `${resPct * 100}%`;
   document.getElementById('resource-text').textContent = `${classResources[p.class]}: ${Math.floor(p.currentResource)}/${p.maxResource}`;
   const xpPct = Math.max(0, Math.min(1, p.xp / p.xpToNext));
@@ -1724,12 +1868,17 @@ function renderTopbar() {
 }
 
 function updateBars() {
+  if (state.player && playerHpBar) {
+    const derived = applyBonuses(state.player.baseStats, state.player);
+    state.player.currentHP = Math.min(derived.maxHP, Math.max(0, state.player.currentHP));
+    updateHealthBar(state.player, playerHpBar, playerHpText, derived.maxHP);
+    if (usesRage()) updateRageBar(state.player);
+  }
   if (!state.currentEnemy) return;
-  const pct = Math.max(0, Math.min(1, state.currentEnemy.currentHP / state.currentEnemy.hp));
   const enemyBar = document.querySelector('.bar.enemy');
   if (enemyBar) enemyBar.classList.toggle('boss', !!state.currentEnemy.boss);
-  document.getElementById('enemy-hp').style.width = `${pct * 100}%`;
-  document.getElementById('enemy-hp-text').textContent = `${Math.max(0, Math.floor(state.currentEnemy.currentHP))}/${state.currentEnemy.hp}`;
+  state.currentEnemy.currentHP = Math.min(state.currentEnemy.hp, Math.max(0, state.currentEnemy.currentHP));
+  updateHealthBar(state.currentEnemy, enemyHpBar, enemyHpText, state.currentEnemy.hp);
 }
 
 function updateAll() {
