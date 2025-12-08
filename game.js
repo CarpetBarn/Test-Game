@@ -462,16 +462,28 @@ const zones = [
   },
 ];
 
+const ACTIONS = {
+  HUNT: { id: 'HUNT', label: 'Hunt', baseCooldownMs: 60 * 1000 },
+  CHOP: { id: 'CHOP', label: 'Chop Wood', baseCooldownMs: 120 * 1000 },
+  MINE: { id: 'MINE', label: 'Mine Ore', baseCooldownMs: 120 * 1000 },
+  FISH: { id: 'FISH', label: 'Fish', baseCooldownMs: 120 * 1000 },
+  ADVENTURE: { id: 'ADVENTURE', label: 'Adventure', baseCooldownMs: 10 * 60 * 1000 },
+  WORK: { id: 'WORK', label: 'Work Job', baseCooldownMs: 60 * 60 * 1000 },
+  DUNGEON: { id: 'DUNGEON', label: 'Dungeon', baseCooldownMs: 60 * 60 * 1000 },
+  MINIBOSS: { id: 'MINIBOSS', label: 'Miniboss', baseCooldownMs: 2 * 60 * 60 * 1000 },
+  BOSS: { id: 'BOSS', label: 'Boss', baseCooldownMs: 4 * 60 * 60 * 1000 },
+};
+
 const epicActions = [
-  { id: 'hunt', label: 'Hunt', type: 'combat', cooldown: 30000, difficulty: 0.9, description: 'Fast skirmish for quick loot.' },
-  { id: 'adventure', label: 'Adventure', type: 'combat', cooldown: 45000, difficulty: 1.1, description: 'Longer battle with better rewards.' },
-  { id: 'dungeon', label: 'Dungeon', type: 'combat', cooldown: 180000, difficulty: 1.35, treatAsBoss: true, noUnlock: true, description: 'Hard encounter with superior loot.' },
-  { id: 'miniboss', label: 'Miniboss', type: 'combat', cooldown: 90000, difficulty: 1.22, treatAsBoss: true, noUnlock: true, description: 'Zone elite with higher stakes.' },
-  { id: 'boss', label: 'Boss', type: 'combat', cooldown: 300000, difficulty: 1.45, treatAsBoss: true, description: 'Zone boss unlocks next realm.' },
-  { id: 'chop', label: 'Chop Wood', type: 'gather', skill: 'foraging', sourceType: 'foraging', cooldown: 60000, description: 'Chop or forage timber in the area.' },
-  { id: 'mine', label: 'Mine Ore', type: 'gather', skill: 'mining', sourceType: 'mining', cooldown: 60000, description: 'Mine ore nodes tied to the zone tier.' },
-  { id: 'fish', label: 'Fish', type: 'gather', skill: 'fishing', sourceType: 'fishing', cooldown: 60000, description: 'Cast for fish or treasures.' },
-  { id: 'job', label: 'Work Job', type: 'job', cooldown: 120000, description: 'Do odd jobs for gold and XP.' },
+  { id: 'hunt', cooldownId: 'HUNT', label: 'Hunt', type: 'combat', difficulty: 0.9, description: 'Fast skirmish for quick loot.' },
+  { id: 'adventure', cooldownId: 'ADVENTURE', label: 'Adventure', type: 'combat', difficulty: 1.1, description: 'Longer battle with better rewards.' },
+  { id: 'dungeon', cooldownId: 'DUNGEON', label: 'Dungeon', type: 'combat', difficulty: 1.35, treatAsBoss: true, noUnlock: true, description: 'Hard encounter with superior loot.' },
+  { id: 'miniboss', cooldownId: 'MINIBOSS', label: 'Miniboss', type: 'combat', difficulty: 1.22, treatAsBoss: true, noUnlock: true, description: 'Zone elite with higher stakes.' },
+  { id: 'boss', cooldownId: 'BOSS', label: 'Boss', type: 'combat', difficulty: 1.45, treatAsBoss: true, description: 'Zone boss unlocks next realm.' },
+  { id: 'chop', cooldownId: 'CHOP', label: 'Chop Wood', type: 'gather', skill: 'foraging', sourceType: 'foraging', description: 'Chop or forage timber in the area.' },
+  { id: 'mine', cooldownId: 'MINE', label: 'Mine Ore', type: 'gather', skill: 'mining', sourceType: 'mining', description: 'Mine ore nodes tied to the zone tier.' },
+  { id: 'fish', cooldownId: 'FISH', label: 'Fish', type: 'gather', skill: 'fishing', sourceType: 'fishing', description: 'Cast for fish or treasures.' },
+  { id: 'job', cooldownId: 'WORK', label: 'Work Job', type: 'job', description: 'Do odd jobs for gold and XP.' },
 ];
 
 const skillTrees = {
@@ -744,7 +756,7 @@ function ensureLifeSkills() {
   if (!state.materialHistory) state.materialHistory = {};
   materialTemplates.forEach(mat => { if (!state.materials[mat]) state.materials[mat] = 0; });
   materialTemplates.forEach(mat => { if ((state.materials[mat] || 0) > 0) state.materialHistory[mat] = true; });
-  if (!state.actionCooldowns) state.actionCooldowns = {};
+  ensureActionCooldowns();
   if (!state.recipeUnlocks) state.recipeUnlocks = {};
   Object.values(recipeBook).flat().forEach(rec => {
     if (rec.autoUnlock && !state.recipeUnlocks[rec.id]) state.recipeUnlocks[rec.id] = true;
@@ -761,19 +773,65 @@ function knownMaterials() {
 
 function formatCooldown(ms) {
   const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
-  const m = Math.floor(totalSeconds / 60);
-  const s = totalSeconds % 60;
-  return m > 0 ? `${m}:${s.toString().padStart(2, '0')}` : `${s}s`;
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours > 0) return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
+function defaultActionCooldowns() {
+  const defaults = {};
+  Object.keys(ACTIONS).forEach(key => { defaults[key] = { lastUsedAt: 0 }; });
+  return defaults;
+}
+
+function ensureActionCooldowns() {
+  if (!state.actionCooldowns) state.actionCooldowns = {};
+  const normalized = {};
+  Object.entries(state.actionCooldowns).forEach(([key, value]) => {
+    const upKey = key.toUpperCase();
+    if (typeof value === 'number') {
+      const duration = getActionCooldownMs(upKey);
+      normalized[upKey] = { lastUsedAt: Math.max(0, value - duration) };
+    } else {
+      normalized[upKey] = { lastUsedAt: value.lastUsedAt || 0 };
+    }
+  });
+  state.actionCooldowns = { ...defaultActionCooldowns(), ...normalized };
+}
+
+function getActionCooldownMs(actionId) {
+  const key = actionId.toUpperCase();
+  const config = ACTIONS[key];
+  if (!config) return 0;
+  const modifier = 1; // Placeholder for future perk-driven reductions
+  return Math.floor(config.baseCooldownMs * modifier);
 }
 
 function getActionCooldownState(id) {
-  const readyAt = state.actionCooldowns[id] || 0;
-  const remaining = readyAt - Date.now();
+  const remaining = getActionRemainingMs(id);
   return { ready: remaining <= 0, remaining: Math.max(0, remaining) };
 }
 
-function startActionCooldown(id, duration) {
-  state.actionCooldowns[id] = Date.now() + duration;
+function getActionRemainingMs(actionId) {
+  const key = actionId.toUpperCase();
+  const config = ACTIONS[key];
+  const tracker = state.actionCooldowns[key] || { lastUsedAt: 0 };
+  if (!config) return 0;
+  const readyAt = tracker.lastUsedAt + getActionCooldownMs(key);
+  return Math.max(0, readyAt - Date.now());
+}
+
+function isActionReady(actionId) {
+  return getActionRemainingMs(actionId) <= 0;
+}
+
+function startActionCooldown(id) {
+  const key = id.toUpperCase();
+  if (!ACTIONS[key]) return;
+  state.actionCooldowns[key] = { lastUsedAt: Date.now() };
+  saveGame();
 }
 
 const playerHpBar = document.getElementById('hp-bar');
@@ -915,23 +973,23 @@ function performEpicAction(actionId) {
   const action = epicActions.find(a => a.id === actionId);
   const wrap = document.getElementById('epic-actions');
   if (!action) return;
-  const cd = getActionCooldownState(actionId);
+  const cd = getActionCooldownState(action.cooldownId || actionId);
   if (!cd.ready) { logMessage('Action is on cooldown.'); return; }
   if (state.currentZone >= state.unlockedZones) { logMessage('Unlock the zone boss first.'); return; }
   const zone = zones[state.currentZone];
   if (!zone) { logMessage('Choose a zone to act in.'); return; }
   if (action.type === 'combat') {
     const opts = { mode: actionId, difficulty: action.difficulty, treatAsBoss: action.treatAsBoss, noUnlock: action.noUnlock };
-    startActionCooldown(actionId, action.cooldown);
+    startActionCooldown(action.cooldownId || actionId);
     startFight(actionId === 'boss', false, opts);
   } else if (action.type === 'gather') {
     const lifeSet = lifeActions[action.skill] || [];
     if (!lifeSet.length) { logMessage('No gathering action available.'); return; }
     const base = { ...lifeSet[0], sourceType: action.sourceType || lifeSet[0].sourceType };
-    startActionCooldown(actionId, action.cooldown);
+    startActionCooldown(action.cooldownId || actionId);
     performLifeAction(action.skill, base);
   } else if (action.type === 'job') {
-    startActionCooldown(actionId, action.cooldown);
+    startActionCooldown(action.cooldownId || actionId);
     const goldEarned = Math.round(30 + state.player.level * 4);
     const xpEarned = Math.round(state.player.xpToNext * 0.15);
     state.player.gold += goldEarned;
@@ -2001,7 +2059,7 @@ function renderEpicActionButtons() {
   const lockedZone = state.currentZone >= state.unlockedZones;
   epicActions.forEach(action => {
     const btn = document.createElement('button');
-    const cd = getActionCooldownState(action.id);
+    const cd = getActionCooldownState(action.cooldownId || action.id);
     const bossLevelLock = zone.level + 2;
     let disabled = lockedZone || !cd.ready;
     let label = cd.ready ? action.label : `${action.label} (${formatCooldown(cd.remaining)})`;
@@ -2013,12 +2071,43 @@ function renderEpicActionButtons() {
     btn.className = action.type === 'combat' ? 'primary' : action.type === 'job' ? 'secondary' : 'ghost';
     btn.disabled = disabled;
     btn.title = action.description;
+    btn.dataset.actionKey = (action.cooldownId || action.id).toUpperCase();
+    btn.dataset.action = (action.cooldownId || action.id).toUpperCase();
+    btn.dataset.baseLabel = action.label;
+    btn.dataset.actionId = action.id;
     btn.onclick = () => performEpicAction(action.id);
     wrap.appendChild(btn);
   });
   const cdSummary = document.getElementById('cooldown-summary');
   if (cdSummary) {
-    const busy = epicActions.filter(a => !getActionCooldownState(a.id).ready).length;
+    const busy = epicActions.filter(a => !getActionCooldownState(a.cooldownId || a.id).ready).length;
+    cdSummary.textContent = busy ? `${busy} actions on cooldown` : 'All actions ready';
+  }
+}
+
+function updateEpicActionTimers() {
+  const buttons = document.querySelectorAll('#epic-actions [data-action-key]');
+  const zone = zones[state.currentZone];
+  const lockedZone = state.currentZone >= state.unlockedZones;
+  buttons.forEach(btn => {
+    const key = btn.dataset.actionKey;
+    const label = btn.dataset.baseLabel || key;
+    const actionId = btn.dataset.actionId;
+    const remaining = getActionRemainingMs(key);
+    const bossLevelLock = zone ? zone.level + 2 : Infinity;
+    const levelLocked = actionId === 'boss' && state.player && state.player.level < bossLevelLock;
+    if (remaining <= 0 && !lockedZone && !levelLocked) {
+      btn.disabled = false;
+      btn.textContent = label;
+    } else {
+      btn.disabled = true;
+      btn.textContent = remaining > 0 ? `${label} (${formatCooldown(remaining)})` : label;
+    }
+    if (levelLocked && remaining <= 0) btn.textContent = `${label} (Lv ${bossLevelLock})`;
+  });
+  const cdSummary = document.getElementById('cooldown-summary');
+  if (cdSummary) {
+    const busy = epicActions.filter(a => !getActionCooldownState(a.cooldownId || a.id).ready).length;
     cdSummary.textContent = busy ? `${busy} actions on cooldown` : 'All actions ready';
   }
 }
@@ -2735,7 +2824,7 @@ function initGame() {
   document.getElementById('auto-btn').onclick = () => autoBattle(false);
   document.getElementById('attack-btn').onclick = () => CombatSystem.playerAction('attack');
   document.getElementById('refresh-shop').onclick = () => { generateShop(); renderShop(); saveGame(); };
-  setInterval(() => renderEpicActionButtons(), 1000);
+  setInterval(() => updateEpicActionTimers(), 1000);
   ['slot','rarity','type'].forEach(key => {
     document.getElementById(`filter-${key}`).addEventListener('change', (e) => {
       state.filters[key] = e.target.value;
