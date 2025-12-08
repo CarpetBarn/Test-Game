@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RNG Looter RPG</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="class-select" class="modal">
+    <div class="modal-content">
+      <h2>Choose Your Class</h2>
+      <div id="class-options" class="class-grid"></div>
+    </div>
+  </div>
+
+  <header class="topbar">
+    <div>
+      <span id="player-name">Adventurer</span> • <span id="player-class"></span>
+    </div>
+    <div class="bars">
+      <div class="bar"><div id="hp-bar" class="fill"></div><span id="hp-text"></span></div>
+      <div class="bar xp"><div id="xp-bar" class="fill"></div><span id="xp-text"></span></div>
+    </div>
+    <div class="top-stats">
+      <span id="player-level"></span>
+      <span id="player-gold"></span>
+      <span id="player-dragon"></span>
+      <span id="player-prestige"></span>
+      <button id="prestige-btn">Prestige</button>
+      <button id="reset-btn">Reset</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="panel">
+      <h3>Zones</h3>
+      <div id="zone-list"></div>
+      <div class="zone-controls">
+        <div class="auto-row">
+          <label for="auto-count" class="small">Auto battles</label>
+          <input id="auto-count" type="number" min="1" max="10" value="3">
+        </div>
+        <button id="fight-btn">Fight!</button>
+        <button id="boss-btn">Fight Boss</button>
+        <button id="auto-btn">Auto Battle</button>
+      </div>
+      <div id="event-area" class="event"></div>
+    </section>
+
+    <section class="panel center">
+      <div id="enemy-display"></div>
+      <div class="bars">
+        <div class="bar enemy"><div id="enemy-hp" class="fill"></div><span id="enemy-hp-text"></span></div>
+      </div>
+      <div id="combat-log" class="log"></div>
+    </section>
+
+    <section class="panel">
+      <div class="tabs">
+        <button data-tab="equipment" class="active">Equipment</button>
+        <button data-tab="inventory">Inventory</button>
+        <button data-tab="dragons">Dragons</button>
+        <button data-tab="skills">Skill Tree</button>
+        <button data-tab="shop">Shop</button>
+      </div>
+      <div id="tab-content">
+        <div id="equipment" class="tab active">
+          <div id="equipment-slots"></div>
+        </div>
+        <div id="inventory" class="tab">
+          <div class="filters">
+            <label>Slot
+              <select id="filter-slot">
+                <option value="all">All</option>
+                <option value="weapon">Weapon</option>
+                <option value="armor">Armor</option>
+                <option value="helmet">Helmet</option>
+                <option value="boots">Boots</option>
+                <option value="accessory">Accessory</option>
+              </select>
+            </label>
+            <label>Rarity
+              <select id="filter-rarity">
+                <option value="all">All</option>
+                <option value="common">Common</option>
+                <option value="uncommon">Uncommon</option>
+                <option value="rare">Rare</option>
+                <option value="epic">Epic</option>
+                <option value="legendary">Legendary</option>
+              </select>
+            </label>
+            <label>Type
+              <select id="filter-type">
+                <option value="all">All</option>
+                <option value="gear">Gear</option>
+                <option value="potion">Healing</option>
+                <option value="egg">Egg</option>
+              </select>
+            </label>
+            <button id="sell-filtered" class="wide">Sell All Shown</button>
+          </div>
+          <div id="inventory-list"></div>
+        </div>
+        <div id="dragons" class="tab">
+          <div id="egg-list"></div>
+          <div id="active-dragon"></div>
+          <div id="combine-area"></div>
+        </div>
+        <div id="skills" class="tab">
+          <div id="skill-points"></div>
+          <div id="skill-tree"></div>
+        </div>
+        <div id="shop" class="tab">
+          <div class="shop-header">
+            <button id="refresh-shop">Refresh Wares</button>
+            <div id="shop-timer" class="small"></div>
+          </div>
+          <div id="shop-list" class="shop-grid"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+  <script src="game.js"></script>
+</body>
+</html>
