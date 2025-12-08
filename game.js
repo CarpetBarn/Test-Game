@@ -568,6 +568,7 @@ const state = {
   prestige: 0,
   lifeSkills: {},
   materials: {},
+  materialHistory: {},
   recipeUnlocks: {},
   foodBuff: null,
   selectedLifeSkill: 'mining',
@@ -624,11 +625,21 @@ function ensureLifeSkills() {
   Object.keys(lifeSkillDefs).forEach(k => {
     if (!state.lifeSkills[k]) state.lifeSkills[k] = { level: 1, currentXP: 0, xpToNext: 50 };
   });
+  if (!state.materialHistory) state.materialHistory = {};
   materialTemplates.forEach(mat => { if (!state.materials[mat]) state.materials[mat] = 0; });
+  materialTemplates.forEach(mat => { if ((state.materials[mat] || 0) > 0) state.materialHistory[mat] = true; });
   if (!state.recipeUnlocks) state.recipeUnlocks = {};
   Object.values(recipeBook).flat().forEach(rec => {
     if (rec.autoUnlock && !state.recipeUnlocks[rec.id]) state.recipeUnlocks[rec.id] = true;
   });
+}
+
+function hasSeenMaterial(id) {
+  return (state.materials[id] || 0) > 0 || !!(state.materialHistory && state.materialHistory[id]);
+}
+
+function knownMaterials() {
+  return materialCatalog.filter(m => (state.materials[m.id] || 0) > 0);
 }
 
 const playerHpBar = document.getElementById('hp-bar');
@@ -1487,6 +1498,7 @@ function gainLifeSkillXP(id, amount) {
 function addMaterial(id, qty) {
   ensureLifeSkills();
   state.materials[id] = (state.materials[id] || 0) + qty;
+  if (!state.materialHistory[id]) state.materialHistory[id] = true;
 }
 
 function performLifeAction(skillId, action) {
@@ -2136,7 +2148,12 @@ function renderMaterials() {
   matWrap.innerHTML = '<h5>Materials</h5>';
   const grid = document.createElement('div');
   grid.className = 'materials';
-  materialCatalog.forEach(mat => {
+  const materials = knownMaterials();
+  if (!materials.length) {
+    matWrap.innerHTML += '<div class="small muted">Gather to discover materials.</div>';
+    return;
+  }
+  materials.forEach(mat => {
     const qty = state.materials[mat.id] || 0;
     const div = document.createElement('div');
     div.className = `material rarity-${mat.rarityColor}`;
@@ -2150,22 +2167,41 @@ function renderLifeActions() {
   const actionsWrap = document.getElementById('life-actions');
   const recipeWrap = document.getElementById('life-recipes');
   const title = document.getElementById('life-selected-title');
+  const meta = document.getElementById('life-selected-meta');
+  const primary = document.getElementById('life-perform-btn');
   if (!actionsWrap || !recipeWrap || !title) return;
   actionsWrap.innerHTML = '';
   recipeWrap.innerHTML = '';
   const id = state.selectedLifeSkill || 'mining';
   const skill = state.lifeSkills[id];
   title.textContent = `${lifeSkillDefs[id].name} Actions`;
+  if (meta) meta.textContent = `Level ${skill.level} • ${skill.currentXP}/${skill.xpToNext} XP`;
+  const actionLabels = {
+    mining: 'Mine', foraging: 'Forage', fishing: 'Fish', hunting: 'Hunt',
+    blacksmithing: 'Craft Item', alchemy: 'Brew Potion', cooking: 'Cook Meal', enchanting: 'Apply Enchant',
+  };
+  if (primary) {
+    primary.textContent = actionLabels[id] || 'Perform';
+    const actions = lifeActions[id] || [];
+    primary.onclick = () => {
+      if (actions.length) {
+        performLifeAction(id, actions[0]);
+      } else {
+        const recipes = recipeBook[id] || [];
+        if (recipes.length) {
+          document.getElementById('life-recipes')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          logMessage('Select a recipe below to work this profession.');
+        }
+      }
+    };
+    primary.disabled = !(lifeActions[id] && lifeActions[id].length) && !(recipeBook[id] && recipeBook[id].length);
+  }
   const actions = lifeActions[id] || [];
   if (!actions.length) { actionsWrap.innerHTML = '<div class="small">No active buttons here. Practice via crafting or battle hooks.</div>'; }
   actions.forEach(act => {
     const div = document.createElement('div');
     div.className = 'life-action';
-    div.innerHTML = `<div class="flex"><strong>${act.label}</strong><span class="small">+${act.xp} XP</span></div>`;
-    const btn = document.createElement('button');
-    btn.textContent = 'Perform';
-    btn.onclick = () => performLifeAction(id, act);
-    div.appendChild(btn);
+    div.innerHTML = `<div class="flex"><strong>${act.label}</strong><span class="small">+${act.xp} XP</span></div><div class="tiny muted">Use the action button above.</div>`;
     actionsWrap.appendChild(div);
   });
   if (id === 'dragonHandling') {
@@ -2185,7 +2221,10 @@ function renderLifeActions() {
     card.innerHTML = `<div class="flex"><strong>${rec.name}</strong><span class="small">Lv ${rec.skillReq} • Tier ${rec.tier}</span></div><div class="small">${rec.desc}</div>`;
     const matList = document.createElement('div');
     matList.className = 'small';
-    matList.textContent = 'Mats: ' + Object.entries(rec.mats).map(([m, q]) => `${(materialCatalog.find(x => x.id === m)?.name) || m} x${q}`).join(', ');
+    const knownMats = Object.entries(rec.mats).filter(([m]) => hasSeenMaterial(m));
+    matList.textContent = knownMats.length
+      ? 'Mats: ' + knownMats.map(([m, q]) => `${(materialCatalog.find(x => x.id === m)?.name) || m} x${q} (${state.materials[m] || 0})`).join(', ')
+      : 'Mats: ??? (discover required materials)';
     card.appendChild(matList);
     const btn = document.createElement('button');
     btn.textContent = learned ? 'Craft' : 'Locked';
@@ -2211,6 +2250,7 @@ function renderRefinement() {
   refine.innerHTML = '<h5>Refine Materials</h5>';
   refineChains.forEach(chain => {
     const have = state.materials[chain.input] || 0;
+    if (have <= 0) return;
     const can = Math.floor(have / chain.ratio);
     const matName = materialCatalog.find(m => m.id === chain.input)?.name || chain.input;
     const outName = materialCatalog.find(m => m.id === chain.output)?.name || chain.output;
@@ -2358,6 +2398,7 @@ function saveGame() {
     prestige: state.prestige,
     lifeSkills: state.lifeSkills,
     materials: state.materials,
+    materialHistory: state.materialHistory,
     recipeUnlocks: state.recipeUnlocks,
     foodBuff: state.foodBuff,
   };
@@ -2381,6 +2422,7 @@ function loadGame() {
     state.prestige = parsed.prestige || 0;
     state.lifeSkills = parsed.lifeSkills || defaultLifeSkills();
     state.materials = parsed.materials || {};
+    state.materialHistory = parsed.materialHistory || {};
     state.foodBuff = parsed.foodBuff || null;
     state.recipeUnlocks = parsed.recipeUnlocks || {};
     ensureLifeSkills();
