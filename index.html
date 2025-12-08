@@ -78,6 +78,7 @@
         <button data-tab="inventory">Inventory</button>
         <button data-tab="dragons">Dragons</button>
         <button data-tab="skills">Skill Tree</button>
+        <button data-tab="life">Life Skills</button>
         <button data-tab="shop">Shop</button>
       </div>
       <div id="tab-content">
@@ -111,6 +112,7 @@
                 <option value="all">All</option>
                 <option value="gear">Gear</option>
                 <option value="potion">Healing</option>
+                <option value="food">Food</option>
                 <option value="egg">Egg</option>
               </select>
             </label>
@@ -126,6 +128,21 @@
         <div id="skills" class="tab">
           <div id="skill-points"></div>
           <div id="skill-tree"></div>
+        </div>
+        <div id="life" class="tab">
+          <div class="life-layout">
+            <div>
+              <h4>Professions</h4>
+              <div id="life-skill-list"></div>
+              <div id="materials-list"></div>
+            </div>
+            <div>
+              <h4 id="life-selected-title">Actions</h4>
+              <div id="life-actions"></div>
+              <h4>Recipes</h4>
+              <div id="life-recipes"></div>
+            </div>
+          </div>
         </div>
         <div id="shop" class="tab">
           <div class="shop-header">

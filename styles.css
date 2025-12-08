@@ -152,9 +152,37 @@ body {
   cursor: pointer;
 }
 .skill-branch { margin-bottom: 10px; }
+.skill-tree { display: grid; gap: 8px; }
+.skill-branch {
+  padding-left: 10px;
+  border-left: 2px dashed #2d3a52;
+  position: relative;
+}
+.skill-branch::before {
+  content: '';
+  position: absolute;
+  left: -9px;
+  top: 8px;
+  bottom: 8px;
+  width: 6px;
+  background: linear-gradient(#2d3a52, #394b6e);
+  border-radius: 4px;
+  opacity: 0.5;
+}
 .skill-node {
   cursor: pointer;
   border-left: 4px solid #455a64;
+  margin: 6px 0;
+  position: relative;
+}
+.skill-node::before {
+  content: '';
+  position: absolute;
+  left: -10px;
+  top: 50%;
+  width: 10px;
+  height: 2px;
+  background: #2d3a52;
 }
 .skill-node.unlocked { border-color: #66bb6a; box-shadow: 0 0 8px rgba(102,187,106,0.4); }
 .filters { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; }
@@ -168,6 +196,16 @@ body {
 .event { margin-top: 10px; background: #0b111c; padding: 8px; border-radius: 6px; min-height: 80px; }
 .event button { margin-right: 4px; }
 .better-arrow { color: #66bb6a; font-weight: bold; margin-left: 4px; }
+.life-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.life-skill { padding: 8px; border: 1px solid #2d3a52; border-radius: 6px; margin-bottom: 6px; background: #0f1626; cursor: pointer; }
+.life-skill.active { border-color: #66bb6a; box-shadow: 0 0 8px rgba(102,187,106,0.4); }
+.life-bar { position: relative; background: #0d1422; border: 1px solid #2d3a52; border-radius: 6px; height: 12px; margin-top: 4px; }
+.life-bar .fill { background: linear-gradient(90deg, #2196f3, #64b5f6); height: 100%; width: 0; }
+.life-bar span { position: absolute; left: 50%; top: -2px; transform: translate(-50%, -100%); font-size: 10px; color: #cfd8ea; }
+.life-action, .recipe-card { background: #101725; border: 1px solid #2a3650; border-radius: 6px; padding: 8px; margin-bottom: 6px; }
+.materials { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px,1fr)); gap: 6px; margin-top: 8px; }
+.material { background: #101725; border: 1px solid #2a3650; border-radius: 6px; padding: 6px; font-size: 12px; }
+.badge { display: inline-block; padding: 2px 6px; border-radius: 10px; background: #243148; font-size: 11px; margin-left: 4px; }
 @media (max-width: 900px) {
   .layout { grid-template-columns: 1fr; }
   .bars { width: 100%; }

@@ -21,6 +21,49 @@ const statPool = [
   { key: 'elemental', label: 'Elemental Dmg', base: 2 },
 ];
 
+const lifeSkillDefs = {
+  mining: { name: 'Mining', desc: 'Gather ores, crystals, stones.' },
+  foraging: { name: 'Foraging', desc: 'Harvest herbs, plants, mushrooms.' },
+  fishing: { name: 'Fishing', desc: 'Catch fish and treasure.' },
+  hunting: { name: 'Hunting', desc: 'Track monster parts from enemies.' },
+  blacksmithing: { name: 'Blacksmithing', desc: 'Forge and upgrade gear.' },
+  alchemy: { name: 'Alchemy', desc: 'Brew potions and elixirs.' },
+  cooking: { name: 'Cooking', desc: 'Prepare meals for temporary buffs.' },
+  enchanting: { name: 'Enchanting', desc: 'Reroll or empower items.' },
+  dragonHandling: { name: 'Dragon Handling', desc: 'Reduce hatch time and improve dragons.' },
+  dragonBonding: { name: 'Dragon Bonding', desc: 'Unlock deeper dragon synergies.' },
+  trading: { name: 'Trading', desc: 'Better shop deals and rarer wares.' },
+};
+
+const materialTemplates = [
+  'Iron Ore', 'Crystal Shard', 'Fire Essence', 'Frost Herb', 'Beast Hide', 'River Fish', 'Ancient Bone', 'Dragon Scale', 'Mystic Ink', 'Sungrain'
+];
+
+const lifeActions = {
+  mining: [{ label: 'Mine Ore', xp: 12, rewards: [{ id: 'Iron Ore', min: 1, max: 3, chance: 1 }, { id: 'Crystal Shard', min: 1, max: 2, chance: 0.35 }, { id: 'Fire Essence', min: 1, max: 1, chance: 0.15 }] }],
+  foraging: [{ label: 'Search for Herbs', xp: 10, rewards: [{ id: 'Frost Herb', min: 1, max: 3, chance: 1 }, { id: 'Sungrain', min: 1, max: 2, chance: 0.4 }] }],
+  fishing: [{ label: 'Go Fishing', xp: 11, rewards: [{ id: 'River Fish', min: 1, max: 3, chance: 1 }, { id: 'Crystal Shard', min: 1, max: 1, chance: 0.15 }, { id: 'Dragon Scale', min: 1, max: 1, chance: 0.05 }] }],
+  hunting: [{ label: 'Dress Game', xp: 8, rewards: [{ id: 'Beast Hide', min: 1, max: 2, chance: 1 }, { id: 'Ancient Bone', min: 1, max: 2, chance: 0.35 }] }],
+};
+
+const recipeBook = {
+  blacksmithing: [
+    { name: 'Forged Longsword', skillReq: 1, type: 'gear', slot: 'weapon', rarity: 'uncommon', levelReq: 5, mats: { 'Iron Ore': 4, 'Beast Hide': 2 }, stats: [{ key: 'attack', label: 'Attack', value: 8 }], desc: 'Balanced blade hammered by hand.' },
+    { name: 'Crystal Plated Armor', skillReq: 3, type: 'gear', slot: 'armor', rarity: 'rare', levelReq: 10, mats: { 'Iron Ore': 6, 'Crystal Shard': 4 }, stats: [{ key: 'defense', label: 'Defense', value: 12 }, { key: 'hp', label: 'Max HP', value: 40 }], desc: 'Crystal-lined plates bolster defense.' }
+  ],
+  alchemy: [
+    { name: 'Stout Healing Draught', skillReq: 1, type: 'potion', rarity: 'uncommon', heal: 60, mats: { 'Frost Herb': 2, 'River Fish': 1 }, desc: 'Restorative tonic that scales with potion bonuses.' },
+    { name: 'Battle Elixir', skillReq: 4, type: 'potion', rarity: 'rare', heal: 0, buff: { attack: 0.08, duration: 3 }, mats: { 'Fire Essence': 2, 'Mystic Ink': 1 }, desc: 'Temporary attack boon for three battles.' }
+  ],
+  cooking: [
+    { name: 'Hearty Stew', skillReq: 1, type: 'food', rarity: 'uncommon', buff: { hp: 0.08, duration: 3 }, mats: { 'Sungrain': 2, 'River Fish': 1 }, desc: 'Adds hearty vigor for a few fights.' },
+    { name: 'Hunter Pie', skillReq: 4, type: 'food', rarity: 'rare', buff: { loot: 0.06, crit: 0.04, duration: 3 }, mats: { 'Beast Hide': 1, 'Sungrain': 2, 'Frost Herb': 1 }, desc: 'Sweetens loot odds and crits briefly.' }
+  ],
+  enchanting: [
+    { name: 'Spark of Renewal', skillReq: 5, type: 'enchant', rarity: 'rare', mats: { 'Mystic Ink': 2, 'Crystal Shard': 2 }, desc: 'Reroll stats on a chosen gear item.', effect: 'reroll' },
+  ]
+};
+
 const classData = {
   Warrior: { hp: 120, attack: 12, defense: 8, crit: 5, mana: 30, tag: 'melee' },
   Mage: { hp: 90, attack: 15, defense: 4, crit: 8, mana: 60, tag: 'caster' },
@@ -408,6 +451,10 @@ const state = {
   shop: [],
   filters: { slot: 'all', rarity: 'all', type: 'all' },
   prestige: 0,
+  lifeSkills: {},
+  materials: {},
+  foodBuff: null,
+  selectedLifeSkill: 'mining',
 };
 
 function createPlayer(cls) {
@@ -443,6 +490,22 @@ function ensureModifierDefaults(player) {
   player.currentResource = player.currentResource || player.maxResource;
 }
 
+function defaultLifeSkills() {
+  const skills = {};
+  Object.keys(lifeSkillDefs).forEach(k => { skills[k] = { level: 1, currentXP: 0, xpToNext: 50 }; });
+  return skills;
+}
+
+function ensureLifeSkills() {
+  if (!state.lifeSkills || !Object.keys(state.lifeSkills).length) {
+    state.lifeSkills = defaultLifeSkills();
+  }
+  Object.keys(lifeSkillDefs).forEach(k => {
+    if (!state.lifeSkills[k]) state.lifeSkills[k] = { level: 1, currentXP: 0, xpToNext: 50 };
+  });
+  materialTemplates.forEach(mat => { if (!state.materials[mat]) state.materials[mat] = 0; });
+}
+
 function weightedRarity(isBoss) {
   const totalWeight = rarities.reduce((t, r) => t + (isBoss ? r.weight * 1.25 : r.weight), 0);
   let roll = Math.random() * totalWeight;
@@ -474,6 +537,15 @@ function generateItem(level, isBoss = false) {
   return { id: crypto.randomUUID(), type: 'gear', name, slot, rarity: rarity.key, stats, levelReq: Math.max(1, Math.floor(level * 0.8)), power: stats.reduce((t, s) => t + s.value, 0) };
 }
 
+function rerollGear(item) {
+  const level = Math.max(state.player ? state.player.level : 1, item.levelReq || 1);
+  const newItem = generateItem(level, false);
+  item.stats = newItem.stats;
+  item.power = newItem.power;
+  item.rarity = newItem.rarity;
+  item.name = `${item.name.split(' ')[0] || 'Refined'} ${item.slot}`;
+}
+
 function applyBonuses(baseStats, player) {
   const prestigeBonus = 1 + (state.prestige || 0) * 0.03;
   const gearStats = { hp: 0, attack: 0, defense: 0, crit: 0, critdmg: 0, speed: 0, elemental: 0 };
@@ -481,16 +553,22 @@ function applyBonuses(baseStats, player) {
     if (!item) return;
     item.stats.forEach(s => { gearStats[s.key] = (gearStats[s.key] || 0) + s.value; });
   });
-  const dragonFactor = 1 + (player.modifiers.dragonBond || 0);
+  const dragonFactor = 1 + (player.modifiers.dragonBond || 0) + ((state.lifeSkills.dragonBonding ? state.lifeSkills.dragonBonding.level : 0) * 0.01);
   const dragonStats = state.activeDragon ? Object.fromEntries(Object.entries(state.activeDragon.bonus).map(([k, v]) => [k, Math.round(v * dragonFactor)])) : {};
+  const food = state.foodBuff && state.foodBuff.battles > 0 ? state.foodBuff : null;
+  const foodAtk = food && food.attack ? food.attack : 0;
+  const foodHp = food && food.hp ? food.hp : 0;
+  const foodCrit = food && food.crit ? food.crit : 0;
+  const foodLoot = food && food.loot ? food.loot : 0;
   return {
-    maxHP: Math.round((baseStats.hp + (gearStats.hp || 0) + (dragonStats.hp || 0) + (player.flat.hp || 0)) * (1 + player.modifiers.hp) * prestigeBonus),
-    attack: Math.round((baseStats.attack + (gearStats.attack || 0) + (dragonStats.attack || 0) + (player.flat.attack || 0)) * (1 + player.modifiers.attack) * prestigeBonus) + (player.flat.elemental || 0) + (dragonStats.elemental || 0),
+    maxHP: Math.round((baseStats.hp + (gearStats.hp || 0) + (dragonStats.hp || 0) + (player.flat.hp || 0)) * (1 + player.modifiers.hp + foodHp) * prestigeBonus),
+    attack: Math.round((baseStats.attack + (gearStats.attack || 0) + (dragonStats.attack || 0) + (player.flat.attack || 0)) * (1 + player.modifiers.attack + foodAtk) * prestigeBonus) + (player.flat.elemental || 0) + (dragonStats.elemental || 0),
     defense: Math.round((baseStats.defense + (gearStats.defense || 0) + (dragonStats.defense || 0)) * (1 + player.modifiers.defense) * prestigeBonus),
-    crit: (baseStats.crit + (gearStats.crit || 0) + (dragonStats.crit || 0)) * (1 + player.modifiers.crit) * prestigeBonus,
+    crit: (baseStats.crit + (gearStats.crit || 0) + (dragonStats.crit || 0)) * (1 + player.modifiers.crit + foodCrit) * prestigeBonus,
     critdmg: 1.5 + (gearStats.critdmg || 0) / 100 + player.modifiers.critdmg + (dragonStats.critdmg || 0),
     speed: (baseStats.speed || 0) + (gearStats.speed || 0) + (player.flat.speed || 0) + (dragonStats.speed || 0),
     elemental: (gearStats.elemental || 0) + (dragonStats.elemental || 0),
+    lootBuff: foodLoot,
   };
 }
 
@@ -859,6 +937,7 @@ function finishCombat(result, bossFlag) {
     player.xp += xpGain;
     player.gold += goldGain;
     logMessage(`Victory! +${xpGain} XP, +${goldGain} gold.`);
+    gainLifeSkillXP('hunting', 6);
     if (player.modifiers.heal) {
       player.currentHP += player.modifiers.heal;
       logMessage(`You recover ${player.modifiers.heal} HP after battle.`);
@@ -879,6 +958,10 @@ function finishCombat(result, bossFlag) {
   levelCheck();
   player.currentHP = Math.min(applyBonuses(player.baseStats, player).maxHP, player.currentHP <= 0 ? applyBonuses(player.baseStats, player).maxHP : player.currentHP);
   player.currentResource = Math.min(player.currentResource + 4, player.maxResource);
+  if (state.foodBuff && state.foodBuff.battles > 0) {
+    state.foodBuff.battles -= 1;
+    if (state.foodBuff.battles <= 0) logMessage(`${state.foodBuff.source || 'Food buff'} fades.`);
+  }
   updateAll();
   if (state.autoMode && state.autoMode.remaining > 1 && player.currentHP > 0) {
     state.autoMode.remaining -= 1;
@@ -904,7 +987,8 @@ function levelCheck() {
 }
 
 function dropLoot(boss) {
-  const lootChance = boss ? 0.9 : 0.55 + (state.player.modifiers.lootBoost || 0);
+  const derived = applyBonuses(state.player.baseStats, state.player);
+  const lootChance = boss ? 0.9 : 0.55 + (state.player.modifiers.lootBoost || 0) + (derived.lootBuff || 0);
   if (Math.random() < lootChance) {
     const item = generateItem(state.player.level, boss);
     state.inventory.push(item);
@@ -921,6 +1005,7 @@ function dropLoot(boss) {
     state.eggs.push(egg);
     logMessage(`You obtained a ${egg.rarity} dragon egg!`);
   }
+  grantCombatMaterials(boss);
 }
 
 function createEgg(boss) {
@@ -950,15 +1035,37 @@ function createPotion(level) {
   return { id: crypto.randomUUID(), type: 'potion', name: choice.name, rarity: choice.rarity, heal: choice.base + level * choice.scale, price: 15 + level * 5 + choice.scale };
 }
 
+function grantCombatMaterials(boss) {
+  ensureLifeSkills();
+  const huntingLevel = state.lifeSkills.hunting ? state.lifeSkills.hunting.level : 1;
+  const bonusChance = 1 + huntingLevel * 0.03;
+  const drops = [
+    { id: 'Beast Hide', chance: 0.35 },
+    { id: 'Ancient Bone', chance: 0.25 },
+    { id: 'Fire Essence', chance: boss ? 0.3 : 0.1 },
+  ];
+  drops.forEach(d => {
+    if (Math.random() < d.chance * bonusChance) {
+      const qty = 1 + Math.floor(Math.random() * Math.max(1, Math.floor(huntingLevel / 4)) + 1);
+      addMaterial(d.id, qty);
+      logMessage(`You recover ${d.id} x${qty} from the battle.`);
+    }
+  });
+}
+
 function hatchProgress() {
   state.eggs.forEach(egg => {
     if (!egg.hatched) {
-      egg.progress++;
+      const handlerLevel = state.lifeSkills.dragonHandling ? state.lifeSkills.dragonHandling.level : 1;
+      const bonus = 1 + Math.floor(handlerLevel / 3) * 0.2;
+      egg.progress += bonus;
       if (egg.progress >= egg.requirement) {
         egg.hatched = true;
         egg.dragon = { name: `${egg.rarity} Dragonling`, rarity: egg.rarity, bonus: egg.bonus };
         logMessage(`${egg.dragon.name} has hatched!`);
         if (!state.activeDragon) state.activeDragon = egg.dragon;
+        gainLifeSkillXP('dragonHandling', 10);
+        gainLifeSkillXP('dragonBonding', 6);
       }
     }
   });
@@ -1062,12 +1169,96 @@ function renderEvent(ev) {
   });
 }
 
+function gainLifeSkillXP(id, amount) {
+  ensureLifeSkills();
+  const skill = state.lifeSkills[id];
+  skill.currentXP += amount;
+  let leveled = false;
+  while (skill.currentXP >= skill.xpToNext) {
+    skill.currentXP -= skill.xpToNext;
+    skill.level += 1;
+    skill.xpToNext = Math.floor(skill.xpToNext * 1.32 + 8);
+    leveled = true;
+  }
+  if (leveled) logMessage(`${lifeSkillDefs[id].name} reached level ${skill.level}!`);
+}
+
+function addMaterial(id, qty) {
+  ensureLifeSkills();
+  state.materials[id] = (state.materials[id] || 0) + qty;
+}
+
+function performLifeAction(skillId, action) {
+  const skill = state.lifeSkills[skillId];
+  const levelBonus = 1 + skill.level * 0.02;
+  let gained = [];
+  action.rewards.forEach(rew => {
+    if (Math.random() < rew.chance * levelBonus) {
+      const qty = Math.max(1, Math.floor(Math.random() * (rew.max - rew.min + 1)) + rew.min);
+      addMaterial(rew.id, qty);
+      gained.push(`${rew.id} x${qty}`);
+    }
+  });
+  gainLifeSkillXP(skillId, action.xp);
+  const msg = gained.length ? `You practice ${lifeSkillDefs[skillId].name} and gain ${gained.join(', ')}.` : `You practice ${lifeSkillDefs[skillId].name} but find nothing.`;
+  logMessage(msg);
+  updateAll();
+}
+
+function craftRecipe(skillId, recipe) {
+  const skill = state.lifeSkills[skillId];
+  if (skill.level < (recipe.skillReq || 1)) { logMessage('Skill level too low.'); return; }
+  const missing = Object.entries(recipe.mats).find(([m, qty]) => (state.materials[m] || 0) < qty);
+  if (missing) { logMessage(`Need more ${missing[0]}.`); return; }
+  Object.entries(recipe.mats).forEach(([m, qty]) => { state.materials[m] -= qty; });
+  gainLifeSkillXP(skillId, 18 + recipe.skillReq * 2);
+  if (recipe.type === 'gear') {
+    const item = { id: crypto.randomUUID(), type: 'gear', name: recipe.name, slot: recipe.slot, rarity: recipe.rarity, stats: recipe.stats, levelReq: recipe.levelReq, power: recipe.stats.reduce((t, s) => t + s.value, 0) };
+    state.inventory.push(item);
+    logMessage(`You craft ${recipe.name}.`);
+  } else if (recipe.type === 'potion') {
+    const item = { id: crypto.randomUUID(), type: 'potion', name: recipe.name, rarity: recipe.rarity, heal: recipe.heal || 0, price: 25 };
+    if (recipe.buff) item.buff = recipe.buff;
+    state.inventory.push(item);
+    logMessage(`You brew ${recipe.name}.`);
+  } else if (recipe.type === 'food') {
+    const food = { id: crypto.randomUUID(), type: 'food', name: recipe.name, rarity: recipe.rarity, buff: recipe.buff, price: 20 };
+    state.inventory.push(food);
+    logMessage(`You cook ${recipe.name}.`);
+  } else if (recipe.type === 'enchant') {
+    renderEnchantSelection(recipe);
+    return;
+  }
+  updateAll();
+}
+
+function renderEnchantSelection(recipe) {
+  const wrap = document.getElementById('life-recipes');
+  const chooser = document.createElement('div');
+  chooser.className = 'recipe-card';
+  chooser.innerHTML = '<div class="small">Choose an item to enchant:</div>';
+  state.inventory.filter(i => i.type === 'gear').forEach(item => {
+    const btn = document.createElement('button');
+    btn.textContent = item.name;
+    btn.onclick = () => {
+      rerollGear(item);
+      logMessage(`${recipe.name} refreshes ${item.name}.`);
+      updateAll();
+    };
+    chooser.appendChild(btn);
+  });
+  wrap.appendChild(chooser);
+}
+
 function generateShop() {
   if (!state.player) return;
+  ensureLifeSkills();
   state.shop = [];
   const level = state.player.level;
-  for (let i = 0; i < 3; i++) {
-    const item = generateItem(level + i, false);
+  const tradeLevel = state.lifeSkills.trading ? state.lifeSkills.trading.level : 1;
+  const stock = 3 + Math.floor(tradeLevel / 5);
+  for (let i = 0; i < stock; i++) {
+    const item = generateItem(level + i, tradeLevel >= 6);
     item.price = Math.max(30, item.power * 3);
     state.shop.push(item);
   }
@@ -1116,15 +1307,18 @@ function renderShop() {
 }
 
 function buyShopItem(item) {
-  if (state.player.gold < item.price) { logMessage('Not enough gold.'); return; }
-  state.player.gold -= item.price;
+  const tradeLevel = state.lifeSkills.trading ? state.lifeSkills.trading.level : 1;
+  const discount = 1 - Math.min(0.35, tradeLevel * 0.02);
+  const finalPrice = Math.ceil(item.price * discount);
+  if (state.player.gold < finalPrice) { logMessage('Not enough gold.'); return; }
+  state.player.gold -= finalPrice;
   state.shop = state.shop.filter(i => i.id !== item.id);
   if (item.type === 'potion' || item.type === 'gear') {
     state.inventory.push(item);
   } else if (item.type === 'egg') {
     state.eggs.push(item);
   }
-  logMessage(`Purchased ${item.name || item.rarity + ' egg'}.`);
+  logMessage(`Purchased ${item.name || item.rarity + ' egg'} for ${finalPrice}.`);
   updateAll();
 }
 
@@ -1183,9 +1377,9 @@ function renderInventory() {
     const card = document.createElement('div');
     card.className = `item rarity-${item.rarity}`;
     if (item.type === 'potion') {
-      card.innerHTML = `<div class="name ${item.rarity}">${item.name}</div><div class="small">Heals ${Math.round(item.heal * (1 + (state.player.modifiers.potionBoost || 0)))} HP</div>`;
+      const healingText = item.heal ? `Heals ${Math.round(item.heal * (1 + (state.player.modifiers.potionBoost || 0)))} HP` : 'Provides a temporary boon';
+      card.innerHTML = `<div class="name ${item.rarity}">${item.name}</div><div class="small">${healingText}</div>`;
       const row = document.createElement('div');
-      row.innerHTML = '';
       const useBtn = document.createElement('button');
       useBtn.textContent = 'Use';
       useBtn.onclick = (e) => { e.stopPropagation(); usePotion(item); };
@@ -1193,6 +1387,18 @@ function renderInventory() {
       sellBtn.textContent = `Sell (${valueFromItem(item)}g)`;
       sellBtn.onclick = (e) => { e.stopPropagation(); sellItem(item); };
       row.appendChild(useBtn);
+      row.appendChild(sellBtn);
+      card.appendChild(row);
+    } else if (item.type === 'food') {
+      card.innerHTML = `<div class="name ${item.rarity}">${item.name}</div><div class="small">Buffs for ${item.buff.duration} battles</div>`;
+      const row = document.createElement('div');
+      const eatBtn = document.createElement('button');
+      eatBtn.textContent = 'Eat';
+      eatBtn.onclick = (e) => { e.stopPropagation(); useFood(item); };
+      const sellBtn = document.createElement('button');
+      sellBtn.textContent = `Sell (${valueFromItem(item)}g)`;
+      sellBtn.onclick = (e) => { e.stopPropagation(); sellItem(item); };
+      row.appendChild(eatBtn);
       row.appendChild(sellBtn);
       card.appendChild(row);
     } else {
@@ -1222,6 +1428,7 @@ function renderInventory() {
 
 function valueFromItem(item) {
   if (item.type === 'potion') return Math.max(5, Math.round(item.price * 0.5));
+  if (item.type === 'food') return Math.max(5, Math.round((item.price || 15) * 0.5));
   if (item.type === 'egg') return valueFromEgg(item);
   return Math.max(5, Math.round((item.power || 5) * 1.5));
 }
@@ -1266,8 +1473,21 @@ function sellItem(item) {
 function usePotion(item) {
   const derived = applyBonuses(state.player.baseStats, state.player);
   const heal = Math.round(item.heal * (1 + (state.player.modifiers.potionBoost || 0)));
-  state.player.currentHP = Math.min(derived.maxHP, state.player.currentHP + heal);
-  logMessage(`You drink ${item.name} and heal ${heal} HP.`);
+  if (item.heal) {
+    state.player.currentHP = Math.min(derived.maxHP, state.player.currentHP + heal);
+    logMessage(`You drink ${item.name} and heal ${heal} HP.`);
+  }
+  if (item.buff) {
+    state.foodBuff = { ...item.buff, battles: item.buff.duration, source: item.name };
+    logMessage(`${item.name} grants a temporary boon for ${item.buff.duration} battles.`);
+  }
+  state.inventory = state.inventory.filter(i => i.id !== item.id);
+  updateAll();
+}
+
+function useFood(item) {
+  state.foodBuff = { ...item.buff, battles: item.buff.duration, source: item.name };
+  logMessage(`You eat ${item.name}. Buffs last ${item.buff.duration} battles.`);
   state.inventory = state.inventory.filter(i => i.id !== item.id);
   updateAll();
 }
@@ -1363,6 +1583,7 @@ function combineEggs(rarityKey) {
 
 function renderSkills() {
   const wrap = document.getElementById('skill-tree');
+  wrap.className = 'skill-tree';
   wrap.innerHTML = '';
   document.getElementById('skill-points').textContent = `Skill Points: ${state.player.skillPoints}`;
   const tree = skillTrees[state.player.class];
@@ -1381,6 +1602,96 @@ function renderSkills() {
     });
     wrap.appendChild(branchDiv);
   });
+}
+
+function renderLifeSkillsTab() {
+  ensureLifeSkills();
+  const list = document.getElementById('life-skill-list');
+  if (!list) return;
+  list.innerHTML = '';
+  Object.entries(lifeSkillDefs).forEach(([id, def]) => {
+    const skill = state.lifeSkills[id];
+    const card = document.createElement('div');
+    card.className = `life-skill ${state.selectedLifeSkill === id ? 'active' : ''}`;
+    card.innerHTML = `<div class="flex"><strong>${def.name}</strong><span class="small">Lv ${skill.level}</span></div><div class="small">${def.desc}</div>`;
+    const bar = document.createElement('div');
+    bar.className = 'life-bar';
+    const fill = document.createElement('div');
+    fill.className = 'fill';
+    fill.style.width = `${Math.min(1, skill.currentXP / skill.xpToNext) * 100}%`;
+    const label = document.createElement('span');
+    label.textContent = `${skill.currentXP}/${skill.xpToNext}`;
+    bar.appendChild(fill); bar.appendChild(label);
+    card.appendChild(bar);
+    card.onclick = () => { state.selectedLifeSkill = id; renderLifeSkillsTab(); };
+    list.appendChild(card);
+  });
+  renderMaterials();
+  renderLifeActions();
+}
+
+function renderMaterials() {
+  const matWrap = document.getElementById('materials-list');
+  if (!matWrap) return;
+  matWrap.innerHTML = '<h5>Materials</h5>';
+  const grid = document.createElement('div');
+  grid.className = 'materials';
+  Object.entries(state.materials).forEach(([id, qty]) => {
+    const div = document.createElement('div');
+    div.className = 'material';
+    div.textContent = `${id}: ${qty}`;
+    grid.appendChild(div);
+  });
+  matWrap.appendChild(grid);
+}
+
+function renderLifeActions() {
+  const actionsWrap = document.getElementById('life-actions');
+  const recipeWrap = document.getElementById('life-recipes');
+  const title = document.getElementById('life-selected-title');
+  if (!actionsWrap || !recipeWrap || !title) return;
+  actionsWrap.innerHTML = '';
+  recipeWrap.innerHTML = '';
+  const id = state.selectedLifeSkill || 'mining';
+  const skill = state.lifeSkills[id];
+  title.textContent = `${lifeSkillDefs[id].name} Actions`;
+  const actions = lifeActions[id] || [];
+  if (!actions.length) { actionsWrap.innerHTML = '<div class="small">No active buttons here. Practice via crafting or battle hooks.</div>'; }
+  actions.forEach(act => {
+    const div = document.createElement('div');
+    div.className = 'life-action';
+    div.innerHTML = `<div class="flex"><strong>${act.label}</strong><span class="small">+${act.xp} XP</span></div>`;
+    const btn = document.createElement('button');
+    btn.textContent = 'Perform';
+    btn.onclick = () => performLifeAction(id, act);
+    div.appendChild(btn);
+    actionsWrap.appendChild(div);
+  });
+  if (id === 'dragonHandling') {
+    actionsWrap.innerHTML += `<div class="small">Higher levels reduce egg hatch battles.</div>`;
+  }
+  if (id === 'dragonBonding') {
+    actionsWrap.innerHTML += `<div class="small">Higher levels boost dragon bonus scaling.</div>`;
+  }
+  if (id === 'trading') {
+    actionsWrap.innerHTML += `<div class="small">Higher levels improve shop prices and rarer wares.</div>`;
+  }
+  const recipes = recipeBook[id] || [];
+  recipes.forEach(rec => {
+    const card = document.createElement('div');
+    card.className = `recipe-card rarity-${rec.rarity}`;
+    card.innerHTML = `<div class="flex"><strong>${rec.name}</strong><span class="small">Req Lv ${rec.skillReq}</span></div><div class="small">${rec.desc}</div>`;
+    const matList = document.createElement('div');
+    matList.className = 'small';
+    matList.textContent = 'Mats: ' + Object.entries(rec.mats).map(([m, q]) => `${m} x${q}`).join(', ');
+    card.appendChild(matList);
+    const btn = document.createElement('button');
+    btn.textContent = 'Craft';
+    btn.onclick = () => craftRecipe(id, rec);
+    card.appendChild(btn);
+    recipeWrap.appendChild(card);
+  });
+  if (!recipes.length) recipeWrap.innerHTML = '<div class="small">No recipes yet.</div>';
 }
 
 function purchaseSkill(key, skill) {
@@ -1428,6 +1739,7 @@ function updateAll() {
   renderInventory();
   renderDragonTab();
   renderSkills();
+  renderLifeSkillsTab();
   renderShop();
   updateBars();
   CombatSystem.updateActionButtons();
@@ -1461,6 +1773,9 @@ function resetGame() {
   state.log = [];
   state.shop = [];
   state.prestige = 0;
+  state.lifeSkills = defaultLifeSkills();
+  state.materials = {};
+  state.foodBuff = null;
   document.getElementById('class-select').style.display = 'flex';
   setupClassSelection();
 }
@@ -1475,6 +1790,9 @@ function saveGame() {
     unlockedZones: state.unlockedZones,
     shop: state.shop,
     prestige: state.prestige,
+    lifeSkills: state.lifeSkills,
+    materials: state.materials,
+    foodBuff: state.foodBuff,
   };
   localStorage.setItem('rpgSave', JSON.stringify(data));
 }
@@ -1493,6 +1811,10 @@ function loadGame() {
     state.unlockedZones = parsed.unlockedZones || 1;
     state.shop = parsed.shop || [];
     state.prestige = parsed.prestige || 0;
+    state.lifeSkills = parsed.lifeSkills || defaultLifeSkills();
+    state.materials = parsed.materials || {};
+    state.foodBuff = parsed.foodBuff || null;
+    ensureLifeSkills();
     return true;
   }
   return false;
@@ -1515,6 +1837,7 @@ function setupClassSelection() {
 }
 
 function initGame() {
+  ensureLifeSkills();
   renderTabs();
   renderZones();
   document.getElementById('fight-btn').onclick = () => startFight(false);
