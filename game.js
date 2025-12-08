@@ -2,6 +2,7 @@
 // Systems: combat, loot, skills, dragons, events, saving
 
 const ENEMY_SCALE = 2;
+const ENEMY_ATTACK_MOD = 5 / 6; // global reduction to enemy attack power
 
 const rarities = [
   { key: 'common', label: 'Common', color: 'common', weight: 70, stats: [1, 2], scale: 1 },
@@ -622,7 +623,7 @@ function applyBonuses(baseStats, player) {
 function pickEnemy(zone, boss = false) {
   const choice = boss ? zone.boss : zone.enemies[Math.floor(Math.random() * zone.enemies.length)];
   const scaledHP = Math.round(choice.hp * ENEMY_SCALE);
-  const scaledAttack = Math.round(choice.attack * ENEMY_SCALE);
+  const scaledAttack = Math.round(choice.attack * ENEMY_SCALE * ENEMY_ATTACK_MOD);
   return { ...choice, hp: scaledHP, attack: scaledAttack, currentHP: scaledHP };
 }
 
@@ -1065,7 +1066,7 @@ function finishCombat(result, bossFlag) {
   const zone = zones[state.currentZone];
   if (victory) {
     const xpBoost = 1 + (player.modifiers.xpBoost || 0);
-    const xpGain = Math.max(1, Math.round(state.currentEnemy.xp * (1/3) * xpBoost));
+    const xpGain = Math.max(1, Math.round(state.currentEnemy.xp * (1 / 3) * 1.25 * xpBoost));
     const goldGain = Math.round(state.currentEnemy.gold * (1 + (player.modifiers.goldBoost || 0)));
     player.xp += xpGain;
     player.gold += goldGain;
@@ -1120,13 +1121,17 @@ function levelCheck() {
     player.baseStats.crit += 0.5;
     player.xpToNext = Math.floor(player.xpToNext * 1.2);
     player.skillPoints++;
+    const derived = applyBonuses(player.baseStats, player);
+    player.currentHP = derived.maxHP;
+    updateHealthBar(player, playerHpBar, playerHpText, derived.maxHP);
     logMessage(`Level up! You reached level ${player.level}.`);
   }
 }
 
 function dropLoot(boss) {
   const derived = applyBonuses(state.player.baseStats, state.player);
-  const lootChance = boss ? 0.9 : 0.55 + (state.player.modifiers.lootBoost || 0) + (derived.lootBuff || 0);
+  const baseLoot = boss ? 0.9 : 0.55;
+  const lootChance = Math.min(0.98, baseLoot * 1.5 + (state.player.modifiers.lootBoost || 0) + (derived.lootBuff || 0));
   if (Math.random() < lootChance) {
     const item = generateItem(state.player.level, boss);
     state.inventory.push(item);
@@ -1137,7 +1142,7 @@ function dropLoot(boss) {
     state.inventory.push(potion);
     logMessage('You found a healing brew.');
   }
-  const eggChance = (boss ? 0.35 : 0.15) * (1 + (state.player.modifiers.eggBoost || 0));
+  const eggChance = (boss ? 0.35 : 0.15) * 0.5 * (1 + (state.player.modifiers.eggBoost || 0));
   if (Math.random() < eggChance) {
     const egg = createEgg(boss);
     state.eggs.push(egg);
@@ -1146,16 +1151,37 @@ function dropLoot(boss) {
   grantCombatMaterials(boss);
 }
 
+function rollDragonBonus(rarity) {
+  const ranges = {
+    hp: [8, 16],
+    attack: [3, 7],
+    defense: [2, 6],
+    crit: [1, 4],
+    critdmg: [0.04, 0.1],
+    elemental: [2, 6],
+    speed: [1, 3],
+  };
+  const keys = Object.keys(ranges);
+  const count = Math.min(keys.length, 3 + Math.floor(Math.random() * 3) + (rarity.key === 'legendary' ? 1 : 0));
+  const picks = [];
+  while (picks.length < count) {
+    const k = keys[Math.floor(Math.random() * keys.length)];
+    if (!picks.includes(k)) picks.push(k);
+  }
+  const bonus = {};
+  picks.forEach(k => {
+    const [min, max] = ranges[k];
+    const roll = min + Math.random() * (max - min);
+    const scaled = roll * rarity.scale;
+    bonus[k] = k === 'critdmg' ? +(scaled.toFixed(3)) : Math.round(scaled);
+  });
+  return bonus;
+}
+
 function createEgg(boss) {
   const rar = weightedRarity(boss);
   const reduction = state.player ? (state.player.modifiers.eggBoost || 0) : 0;
-  const bonus = {
-    hp: Math.round(10 * rar.scale),
-    attack: Math.round(4 * rar.scale),
-    crit: Math.round(2 * rar.scale),
-    critdmg: 0.05 * rar.scale,
-    elemental: Math.round(3 * rar.scale),
-  };
+  const bonus = rollDragonBonus(rar);
   const requirement = Math.max(1, Math.round((3 + Math.floor(Math.random() * 3)) * (1 - reduction)));
   return { id: crypto.randomUUID(), rarity: rar.key, progress: 0, requirement, hatched: false, bonus };
 }
