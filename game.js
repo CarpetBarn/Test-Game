@@ -467,6 +467,8 @@ const ACTIONS = {
   CHOP: { id: 'CHOP', label: 'Chop Wood', baseCooldownMs: 120 * 1000 },
   MINE: { id: 'MINE', label: 'Mine Ore', baseCooldownMs: 120 * 1000 },
   FISH: { id: 'FISH', label: 'Fish', baseCooldownMs: 120 * 1000 },
+  FIGHT: { id: 'FIGHT', label: 'Fight', baseCooldownMs: 30 * 1000 },
+  AUTO_BATTLE: { id: 'AUTO_BATTLE', label: 'Auto Battle', baseCooldownMs: 30 * 1000 },
   ADVENTURE: { id: 'ADVENTURE', label: 'Adventure', baseCooldownMs: 10 * 60 * 1000 },
   WORK: { id: 'WORK', label: 'Work Job', baseCooldownMs: 60 * 60 * 1000 },
   DUNGEON: { id: 'DUNGEON', label: 'Dungeon', baseCooldownMs: 60 * 60 * 1000 },
@@ -979,7 +981,7 @@ function performEpicAction(actionId) {
   const zone = zones[state.currentZone];
   if (!zone) { logMessage('Choose a zone to act in.'); return; }
   if (action.type === 'combat') {
-    const opts = { mode: actionId, difficulty: action.difficulty, treatAsBoss: action.treatAsBoss, noUnlock: action.noUnlock };
+    const opts = { mode: actionId, difficulty: action.difficulty, treatAsBoss: action.treatAsBoss, noUnlock: action.noUnlock, skipFightCooldown: true };
     startActionCooldown(action.cooldownId || actionId);
     startFight(actionId === 'boss', false, opts);
   } else if (action.type === 'gather') {
@@ -1396,6 +1398,11 @@ const CombatSystem = {
 
 function startFight(boss = false, auto = false, opts = {}) {
   if (CombatSystem.active) { logMessage('Finish the current fight first.'); return; }
+  if (!opts.skipFightCooldown) {
+    const fightCd = getActionCooldownState('FIGHT');
+    if (!fightCd.ready) { logMessage(`Fight is on cooldown (${formatCooldown(fightCd.remaining)}).`); return; }
+    startActionCooldown('FIGHT');
+  }
   const zone = zones[state.currentZone];
   const bossLevelLock = zone.level + 2;
   let bossFight = boss || opts.mode === 'boss' || opts.treatAsBoss;
@@ -1436,9 +1443,12 @@ function startFight(boss = false, auto = false, opts = {}) {
 }
 
 function autoBattle(boss = false) {
+  const cdState = getActionCooldownState('AUTO_BATTLE');
+  if (!cdState.ready) { logMessage(`Auto battle ready in ${formatCooldown(cdState.remaining)}.`); return; }
+  startActionCooldown('AUTO_BATTLE');
   const count = Math.max(1, Math.min(10, parseInt(document.getElementById('auto-count').value) || 1));
   state.autoMode = { remaining: count, boss };
-  startFight(boss, true);
+  startFight(boss, true, { skipFightCooldown: true });
 }
 
 function finishCombat(result, bossFlag) {
@@ -1487,7 +1497,7 @@ function finishCombat(result, bossFlag) {
   updateAll();
   if (state.autoMode && state.autoMode.remaining > 1 && player.currentHP > 0) {
     state.autoMode.remaining -= 1;
-    startFight(state.autoMode.boss, true);
+    startFight(state.autoMode.boss, true, { skipFightCooldown: true });
   } else {
     state.autoMode = null;
   }
@@ -2110,6 +2120,43 @@ function updateEpicActionTimers() {
     const busy = epicActions.filter(a => !getActionCooldownState(a.cooldownId || a.id).ready).length;
     cdSummary.textContent = busy ? `${busy} actions on cooldown` : 'All actions ready';
   }
+  updateFightButtons();
+}
+
+function updateFightButtons() {
+  const fightBtn = document.getElementById('fight-btn');
+  const bossBtn = document.getElementById('boss-btn');
+  const autoBtn = document.getElementById('auto-btn');
+  const fightState = getActionCooldownState('FIGHT');
+  const autoState = getActionCooldownState('AUTO_BATTLE');
+  const zone = zones[state.currentZone];
+  const bossLevelLock = zone ? zone.level + 2 : Infinity;
+  const bossLocked = state.player ? state.player.level < bossLevelLock : true;
+  const inCombat = CombatSystem.active;
+  if (fightBtn) {
+    const fightLocked = state.currentZone >= state.unlockedZones || inCombat;
+    let fightLabel = 'Fight';
+    if (!fightState.ready) fightLabel = `Fight (${formatCooldown(fightState.remaining)})`;
+    if (fightLocked) fightLabel = `Fight (${state.currentZone >= state.unlockedZones ? 'Zone Locked' : 'In Combat'})`;
+    fightBtn.textContent = fightLabel;
+    fightBtn.disabled = fightLocked || !fightState.ready;
+  }
+  if (bossBtn) {
+    const fightLocked = state.currentZone >= state.unlockedZones || inCombat;
+    let bossLabel = 'Boss Fight';
+    if (!fightState.ready) bossLabel = `Boss Fight (${formatCooldown(fightState.remaining)})`;
+    if (fightLocked) bossLabel = `Boss Fight (${state.currentZone >= state.unlockedZones ? 'Zone Locked' : 'In Combat'})`;
+    if (bossLocked) bossLabel = `Boss Fight (Lv ${bossLevelLock})`;
+    bossBtn.textContent = bossLabel;
+    bossBtn.disabled = fightLocked || !fightState.ready || bossLocked;
+  }
+  if (autoBtn) {
+    let autoLabel = 'Auto Battle';
+    if (!autoState.ready) autoLabel = `Auto Battle (${formatCooldown(autoState.remaining)})`;
+    if (inCombat) autoLabel = 'Auto Battle (In Combat)';
+    autoBtn.textContent = autoLabel;
+    autoBtn.disabled = inCombat || !autoState.ready;
+  }
 }
 
 function renderEquipment() {
@@ -2713,6 +2760,7 @@ function updateAll() {
   renderShop();
   updateBars();
   CombatSystem.updateActionButtons();
+  updateFightButtons();
   saveGame();
 }
 
