@@ -213,6 +213,14 @@ body {
 .life-action, .recipe-card { background: #101725; border: 1px solid #2a3650; border-radius: 6px; padding: 8px; margin-bottom: 6px; }
 .materials { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px,1fr)); gap: 6px; margin-top: 8px; }
 .material { background: #101725; border: 1px solid #2a3650; border-radius: 6px; padding: 6px; font-size: 12px; }
+.material .tiny { font-size: 0.7rem; opacity: 0.8; }
+.recipe-card.locked { opacity: 0.6; border-style: dashed; }
+#refine-panel, #perk-panel { margin-top: 10px; }
+.perk { padding: 4px; margin: 2px 0; background: #1b1b1b; border-radius: 4px; font-size: 0.8rem; }
+.perk.unlocked { border: 1px solid #4caf50; }
+#socket-panel { margin-top: 10px; border-top: 1px solid #333; padding-top: 8px; }
+.socket-card { background: #161616; margin-bottom: 6px; padding: 6px; border-radius: 6px; }
+.socket-target { display: flex; justify-content: space-between; align-items: center; background: #202020; padding: 6px; border-radius: 6px; margin-top: 4px; }
 .badge { display: inline-block; padding: 2px 6px; border-radius: 10px; background: #243148; font-size: 11px; margin-left: 4px; }
 @media (max-width: 900px) {
   .layout { grid-template-columns: 1fr; }

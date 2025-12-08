@@ -36,34 +36,148 @@ const lifeSkillDefs = {
   trading: { name: 'Trading', desc: 'Better shop deals and rarer wares.' },
 };
 
-const materialTemplates = [
-  'Iron Ore', 'Crystal Shard', 'Fire Essence', 'Frost Herb', 'Beast Hide', 'River Fish', 'Ancient Bone', 'Dragon Scale', 'Mystic Ink', 'Sungrain'
+const materialCatalog = [
+  { id: 'copper_ore', name: 'Copper Ore', tier: 1, rarityColor: 'common', sourceType: 'mining', dropZones: ['Verdantwild', 'Ironhaven'], dropRates: { Verdantwild: 0.7, Ironhaven: 0.6 }, description: 'Soft metal used for novice gear.', usedInRecipes: ['copper_blade', 'simple_stew'] },
+  { id: 'soft_wood', name: 'Soft Wood', tier: 1, rarityColor: 'common', sourceType: 'foraging', dropZones: ['Verdantwild'], dropRates: { Verdantwild: 0.65 }, description: 'Young timber good for handles.', usedInRecipes: ['copper_blade'] },
+  { id: 'basic_herb', name: 'Basic Herbs', tier: 1, rarityColor: 'common', sourceType: 'foraging', dropZones: ['Verdantwild'], dropRates: { Verdantwild: 0.7 }, description: 'Simple herbs for stew and poultices.', usedInRecipes: ['simple_stew', 'novice_potion'] },
+  { id: 'raw_meat', name: 'Raw Meat', tier: 1, rarityColor: 'common', sourceType: 'hunting', dropZones: ['Verdantwild'], dropRates: { Verdantwild: 0.55 }, description: 'Fresh game meat.', usedInRecipes: ['simple_stew'] },
+  { id: 'brook_trout', name: 'Brook Trout', tier: 1, rarityColor: 'common', sourceType: 'fishing', dropZones: ['Verdantwild'], dropRates: { Verdantwild: 0.6 }, description: 'Common river catch used for light meals.', usedInRecipes: ['simple_stew'] },
+
+  { id: 'storm_eel', name: 'Stormreach Eel', tier: 3, rarityColor: 'rare', sourceType: 'fishing', dropZones: ['Stormreach'], dropRates: { Stormreach: 0.35 }, description: 'Eel crackling with latent lightning.', usedInRecipes: ['elemental_tonic'] },
+  { id: 'sky_pearl', name: 'Sky Pearl', tier: 4, rarityColor: 'epic', sourceType: 'fishing', dropZones: ['Stormreach'], dropRates: { Stormreach: 0.2 }, description: 'Shimmering pearl infused with clouds.', usedInRecipes: ['battle_elixir'] },
+
+  { id: 'iron_ore', name: 'Iron Ore', tier: 2, rarityColor: 'uncommon', sourceType: 'mining', dropZones: ['Ironhaven', 'Frostmarch'], dropRates: { Ironhaven: 0.55, Frostmarch: 0.35 }, description: 'Sturdy ore for stronger blades.', usedInRecipes: ['iron_blade', 'frost_soup', 'iron_refine'] },
+  { id: 'cedar_wood', name: 'Cedar Wood', tier: 2, rarityColor: 'uncommon', sourceType: 'foraging', dropZones: ['Frostmarch'], dropRates: { Frostmarch: 0.5 }, description: 'Resinous wood with bite.', usedInRecipes: ['iron_blade'] },
+  { id: 'frostbud', name: 'Frostbud Herb', tier: 2, rarityColor: 'uncommon', sourceType: 'foraging', dropZones: ['Frostmarch'], dropRates: { Frostmarch: 0.55 }, description: 'Cold-loving herb for soups and resistance tonics.', usedInRecipes: ['frost_soup', 'resist_elixir'] },
+  { id: 'venom_gland', name: 'Venom Gland', tier: 2, rarityColor: 'uncommon', sourceType: 'hunting', dropZones: ['Umbravale'], dropRates: { Umbravale: 0.4 }, description: 'Toxic gland useful for alchemy.', usedInRecipes: ['resist_elixir'] },
+
+  { id: 'steel_ore', name: 'Steel Ore', tier: 3, rarityColor: 'rare', sourceType: 'mining', dropZones: ['Ironhaven', 'Cinderpeak'], dropRates: { Ironhaven: 0.35, Cinderpeak: 0.5 }, description: 'Refined ore able to hold great edges.', usedInRecipes: ['steel_greatsword', 'ember_feast', 'steel_refine'] },
+  { id: 'darkwood', name: 'Darkwood', tier: 3, rarityColor: 'rare', sourceType: 'foraging', dropZones: ['Umbravale'], dropRates: { Umbravale: 0.45 }, description: 'Dense lumber, ideal for hardy hafts.', usedInRecipes: ['steel_greatsword'] },
+  { id: 'emberleaf', name: 'Emberleaf', tier: 3, rarityColor: 'rare', sourceType: 'foraging', dropZones: ['Cinderpeak'], dropRates: { Cinderpeak: 0.5 }, description: 'Smoldering leaf that spices hearty meals.', usedInRecipes: ['ember_feast', 'elemental_tonic'] },
+  { id: 'alpha_parts', name: 'Alpha Monster Parts', tier: 3, rarityColor: 'rare', sourceType: 'hunting', dropZones: ['Stormreach'], dropRates: { Stormreach: 0.4 }, description: 'Trophies from tough beasts.', usedInRecipes: ['steel_greatsword'] },
+
+  { id: 'mithril_ore', name: 'Mithril Ore', tier: 4, rarityColor: 'epic', sourceType: 'mining', dropZones: ['Stormreach', 'Cinderpeak'], dropRates: { Stormreach: 0.4, Cinderpeak: 0.35 }, description: 'Light but potent metal.', usedInRecipes: ['mithril_spear', 'battle_elixir', 'mithril_refine'] },
+  { id: 'dragonwood', name: 'Dragonwood', tier: 4, rarityColor: 'epic', sourceType: 'foraging', dropZones: ['Dragon Peaks'], dropRates: { 'Dragon Peaks': 0.4 }, description: 'Bark steeped in draconic heat.', usedInRecipes: ['mithril_spear'] },
+  { id: 'crystal_bloom', name: 'Crystal Bloom', tier: 4, rarityColor: 'epic', sourceType: 'foraging', dropZones: ['Frostmarch', 'Stormreach'], dropRates: { Frostmarch: 0.25, Stormreach: 0.3 }, description: 'Fractal flowers pulsing with mana.', usedInRecipes: ['mithril_spear', 'eternal_elixir'] },
+  { id: 'ancient_essence', name: 'Ancient Essence', tier: 4, rarityColor: 'epic', sourceType: 'enemy', dropZones: ['Everscourge'], dropRates: { Everscourge: 0.2 }, description: 'Phantasmal energy from ruins.', usedInRecipes: ['eternal_elixir'] },
+
+  { id: 'dragonite_ore', name: 'Dragonite Ore', tier: 5, rarityColor: 'legendary', sourceType: 'boss', dropZones: ['Dragon Peaks'], dropRates: { 'Dragon Peaks': 0.15 }, description: 'Legendary ore that hums with power.', usedInRecipes: ['dragonite_waraxe', 'eternal_elixir'] },
+  { id: 'elderwood', name: 'Elderwood', tier: 5, rarityColor: 'legendary', sourceType: 'foraging', dropZones: ['Everscourge'], dropRates: { Everscourge: 0.2 }, description: 'Wood from primordial trees.', usedInRecipes: ['dragonite_waraxe', 'elder_feast'] },
+  { id: 'phoenix_herb', name: 'Phoenix Herb', tier: 5, rarityColor: 'legendary', sourceType: 'foraging', dropZones: ['Cinderpeak'], dropRates: { Cinderpeak: 0.2 }, description: 'Self-rekindling herb with radiant oils.', usedInRecipes: ['elder_feast', 'eternal_elixir'] },
+  { id: 'primordial_core', name: 'Primordial Core', tier: 5, rarityColor: 'legendary', sourceType: 'boss', dropZones: ['Everscourge'], dropRates: { Everscourge: 0.1 }, description: 'Rare core from ancient guardians.', usedInRecipes: ['dragonite_waraxe', 'master_rune'] },
 ];
 
+const materialTemplates = materialCatalog.map(m => m.id);
+
 const lifeActions = {
-  mining: [{ label: 'Mine Ore', xp: 12, rewards: [{ id: 'Iron Ore', min: 1, max: 3, chance: 1 }, { id: 'Crystal Shard', min: 1, max: 2, chance: 0.35 }, { id: 'Fire Essence', min: 1, max: 1, chance: 0.15 }] }],
-  foraging: [{ label: 'Search for Herbs', xp: 10, rewards: [{ id: 'Frost Herb', min: 1, max: 3, chance: 1 }, { id: 'Sungrain', min: 1, max: 2, chance: 0.4 }] }],
-  fishing: [{ label: 'Go Fishing', xp: 11, rewards: [{ id: 'River Fish', min: 1, max: 3, chance: 1 }, { id: 'Crystal Shard', min: 1, max: 1, chance: 0.15 }, { id: 'Dragon Scale', min: 1, max: 1, chance: 0.05 }] }],
-  hunting: [{ label: 'Dress Game', xp: 8, rewards: [{ id: 'Beast Hide', min: 1, max: 2, chance: 1 }, { id: 'Ancient Bone', min: 1, max: 2, chance: 0.35 }] }],
+  mining: [{ label: 'Mine Ore', xp: 14, rewards: materialCatalog.filter(m => m.sourceType === 'mining').map(m => ({ id: m.id, min: 1, max: 3, chance: 0.4 + m.tier * 0.1 })) }],
+  foraging: [{ label: 'Search for Herbs', xp: 12, rewards: materialCatalog.filter(m => m.sourceType === 'foraging').map(m => ({ id: m.id, min: 1, max: 2, chance: 0.35 + m.tier * 0.08 })) }],
+  fishing: [{ label: 'Go Fishing', xp: 11, rewards: materialCatalog.filter(m => m.sourceType === 'fishing').map(m => ({ id: m.id, min: 1, max: 2, chance: 0.4 + m.tier * 0.05 })) }],
+  hunting: [{ label: 'Dress Game', xp: 10, rewards: materialCatalog.filter(m => m.sourceType === 'hunting' || m.sourceType === 'enemy').map(m => ({ id: m.id, min: 1, max: 2, chance: 0.35 + m.tier * 0.07 })) }],
 };
 
 const recipeBook = {
   blacksmithing: [
-    { name: 'Forged Longsword', skillReq: 1, type: 'gear', slot: 'weapon', rarity: 'uncommon', levelReq: 5, mats: { 'Iron Ore': 4, 'Beast Hide': 2 }, stats: [{ key: 'attack', label: 'Attack', value: 8 }], desc: 'Balanced blade hammered by hand.' },
-    { name: 'Crystal Plated Armor', skillReq: 3, type: 'gear', slot: 'armor', rarity: 'rare', levelReq: 10, mats: { 'Iron Ore': 6, 'Crystal Shard': 4 }, stats: [{ key: 'defense', label: 'Defense', value: 12 }, { key: 'hp', label: 'Max HP', value: 40 }], desc: 'Crystal-lined plates bolster defense.' }
-  ],
-  alchemy: [
-    { name: 'Stout Healing Draught', skillReq: 1, type: 'potion', rarity: 'uncommon', heal: 60, mats: { 'Frost Herb': 2, 'River Fish': 1 }, desc: 'Restorative tonic that scales with potion bonuses.' },
-    { name: 'Battle Elixir', skillReq: 4, type: 'potion', rarity: 'rare', heal: 0, buff: { attack: 0.08, duration: 3 }, mats: { 'Fire Essence': 2, 'Mystic Ink': 1 }, desc: 'Temporary attack boon for three battles.' }
+    { id: 'copper_blade', name: 'Copper Sword', skillReq: 1, tier: 1, quality: 'common', profession: 'blacksmithing', type: 'gear', slot: 'weapon', rarity: 'uncommon', levelReq: 4, mats: { copper_ore: 4, soft_wood: 2 }, stats: [{ key: 'attack', label: 'Attack', value: 6 }], desc: 'Basic blade for starting adventurers.', autoUnlock: true },
+    { id: 'iron_blade', name: 'Iron Blade', skillReq: 10, tier: 2, profession: 'blacksmithing', type: 'gear', slot: 'weapon', rarity: 'rare', levelReq: 10, mats: { iron_ore: 6, cedar_wood: 2, soft_wood: 1 }, stats: [{ key: 'attack', label: 'Attack', value: 14 }, { key: 'crit', label: 'Crit %', value: 3 }], desc: 'Sharper iron-forged blade.', rarityTag: 'uncommon' },
+    { id: 'steel_greatsword', name: 'Steel Greatsword', skillReq: 20, tier: 3, profession: 'blacksmithing', type: 'gear', slot: 'weapon', rarity: 'epic', levelReq: 18, mats: { steel_ore: 8, darkwood: 2, alpha_parts: 2 }, stats: [{ key: 'attack', label: 'Attack', value: 28 }, { key: 'critdmg', label: 'Crit DMG %', value: 6 }], desc: 'Heavy sword tempered for raids.' },
+    { id: 'mithril_spear', name: 'Mithril Spear', skillReq: 35, tier: 4, profession: 'blacksmithing', type: 'gear', slot: 'weapon', rarity: 'epic', levelReq: 28, mats: { mithril_ore: 8, crystal_bloom: 2, dragonwood: 2 }, stats: [{ key: 'attack', label: 'Attack', value: 45 }, { key: 'speed', label: 'Speed', value: 6 }], desc: 'Lightweight spear for elite fighters.' },
+    { id: 'dragonite_waraxe', name: 'Dragonite Waraxe', skillReq: 50, tier: 5, profession: 'blacksmithing', type: 'gear', slot: 'weapon', rarity: 'legendary', levelReq: 40, mats: { dragonite_ore: 10, elderwood: 3, primordial_core: 1 }, stats: [{ key: 'attack', label: 'Attack', value: 70 }, { key: 'elemental', label: 'Elemental Dmg', value: 20 }], desc: 'Mythic axe infused with primal flames.', rarityTag: 'legendary' }
   ],
   cooking: [
-    { name: 'Hearty Stew', skillReq: 1, type: 'food', rarity: 'uncommon', buff: { hp: 0.08, duration: 3 }, mats: { 'Sungrain': 2, 'River Fish': 1 }, desc: 'Adds hearty vigor for a few fights.' },
-    { name: 'Hunter Pie', skillReq: 4, type: 'food', rarity: 'rare', buff: { loot: 0.06, crit: 0.04, duration: 3 }, mats: { 'Beast Hide': 1, 'Sungrain': 2, 'Frost Herb': 1 }, desc: 'Sweetens loot odds and crits briefly.' }
+    { id: 'simple_stew', name: 'Simple Stew', skillReq: 1, tier: 1, profession: 'cooking', type: 'food', rarity: 'common', buff: { xpBoost: 0.05, duration: 3 }, mats: { basic_herb: 2, raw_meat: 1 }, desc: 'Comfort stew that boosts XP gain.', autoUnlock: true },
+    { id: 'frost_soup', name: 'Frost Soup', skillReq: 10, tier: 2, profession: 'cooking', type: 'food', rarity: 'uncommon', buff: { crit: 0.1, duration: 3 }, mats: { frostbud: 2, iron_ore: 1 }, desc: 'Chilled soup sharpening focus.' },
+    { id: 'ember_feast', name: 'Ember Feast', skillReq: 20, tier: 3, profession: 'cooking', type: 'food', rarity: 'rare', buff: { attack: 0.2, duration: 2, bossOnly: true }, mats: { emberleaf: 2, raw_meat: 2 }, desc: 'Hunt-ready meal for boss attempts.' },
+    { id: 'sky_salad', name: 'Sky Salad', skillReq: 35, tier: 4, profession: 'cooking', type: 'food', rarity: 'epic', buff: { speed: 0.1, dodge: 0.1, duration: 3 }, mats: { crystal_bloom: 1, dragonwood: 1, raw_meat: 1 }, desc: 'Light salad with floating herbs.' },
+    { id: 'elder_feast', name: 'Elder Feast', skillReq: 50, tier: 5, profession: 'cooking', type: 'food', rarity: 'legendary', buff: { loot: 0.3, duration: 5 }, mats: { elderwood: 1, phoenix_herb: 1, dragonite_ore: 1 }, desc: 'Mythic banquet improving loot finds.' }
+  ],
+  alchemy: [
+    { id: 'novice_potion', name: 'Novice Potion', skillReq: 1, tier: 1, profession: 'alchemy', type: 'potion', rarity: 'common', heal: 60, mats: { basic_herb: 2 }, desc: 'Simple healing brew.', autoUnlock: true },
+    { id: 'resist_elixir', name: 'Venom Resist Elixir', skillReq: 10, tier: 2, profession: 'alchemy', type: 'potion', rarity: 'uncommon', buff: { defense: 0.08, duration: 3, resist: 'poison' }, mats: { venom_gland: 1, frostbud: 1 }, desc: 'Resists toxins for a few battles.' },
+    { id: 'elemental_tonic', name: 'Elemental Tonic', skillReq: 20, tier: 3, profession: 'alchemy', type: 'potion', rarity: 'rare', buff: { elemental: 8, duration: 3 }, mats: { emberleaf: 1, steel_ore: 1 }, desc: 'Boosts elemental potency.' },
+    { id: 'battle_elixir', name: 'Battle Elixir', skillReq: 35, tier: 4, profession: 'alchemy', type: 'potion', rarity: 'epic', buff: { attack: 0.15, crit: 0.08, duration: 3 }, mats: { mithril_ore: 2, crystal_bloom: 1 }, desc: 'Multi-stat combat brew.' },
+    { id: 'eternal_elixir', name: 'Eternal Elixir', skillReq: 50, tier: 5, profession: 'alchemy', type: 'potion', rarity: 'legendary', buff: { attack: 0.2, defense: 0.15, duration: 2, bossOnly: true }, mats: { phoenix_herb: 1, ancient_essence: 1, dragonite_ore: 1 }, desc: 'Boss-only draught of legends.' }
   ],
   enchanting: [
-    { name: 'Spark of Renewal', skillReq: 5, type: 'enchant', rarity: 'rare', mats: { 'Mystic Ink': 2, 'Crystal Shard': 2 }, desc: 'Reroll stats on a chosen gear item.', effect: 'reroll' },
-  ]
+    { id: 'minor_glow', name: 'Minor Glow', skillReq: 5, tier: 1, profession: 'enchanting', type: 'enchant', rarity: 'uncommon', mats: { copper_ore: 1, basic_herb: 1 }, desc: 'Adds small random stat.', effect: 'small' },
+    { id: 'spark_of_renewal', name: 'Spark of Renewal', skillReq: 15, tier: 2, profession: 'enchanting', type: 'enchant', rarity: 'rare', mats: { iron_ore: 2, frostbud: 1 }, desc: 'Reroll stats on a chosen gear item.', effect: 'reroll' },
+    { id: 'greater_affix', name: 'Greater Affix', skillReq: 25, tier: 3, profession: 'enchanting', type: 'enchant', rarity: 'epic', mats: { steel_ore: 2, darkwood: 1 }, desc: 'Adds an affix boosting damage.', effect: 'affix' },
+    { id: 'mythic_upgrade', name: 'Mythic Upgrade', skillReq: 35, tier: 4, profession: 'enchanting', type: 'enchant', rarity: 'epic', mats: { mithril_ore: 3, crystal_bloom: 1 }, desc: 'Chance to upgrade item rarity.', effect: 'upgrade' },
+    { id: 'cut_ruby', name: 'Cut Ruby', skillReq: 15, tier: 2, profession: 'enchanting', type: 'gem', rarity: 'rare', mats: { iron_ore: 2, cedar_wood: 1 }, desc: 'Cut a ruby for attack sockets.', output: { gemId: 'ruby_t1' } },
+    { id: 'cut_emerald', name: 'Cut Emerald', skillReq: 25, tier: 3, profession: 'enchanting', type: 'gem', rarity: 'epic', mats: { steel_ore: 2, emberleaf: 1 }, desc: 'Shape an emerald for crit sockets.', output: { gemId: 'emerald_t3' } },
+    { id: 'master_rune', name: 'Master Rune', skillReq: 50, tier: 5, profession: 'enchanting', type: 'rune', rarity: 'legendary', mats: { primordial_core: 1, crystal_bloom: 2 }, desc: 'Creates a powerful rune for sockets.', output: { runeId: 'rune_mastery' } }
+  ],
 };
+
+const refineChains = [
+  { input: 'copper_ore', output: 'iron_ore', ratio: 3, xp: 10 },
+  { input: 'iron_ore', output: 'steel_ore', ratio: 4, xp: 14 },
+  { input: 'steel_ore', output: 'mithril_ore', ratio: 5, xp: 18 },
+  { input: 'mithril_ore', output: 'dragonite_ore', ratio: 6, xp: 25 },
+];
+
+const qualityTiers = [
+  { key: 'poor', label: 'Poor', boost: -0.1, chance: 0.25, color: 'common' },
+  { key: 'normal', label: 'Normal', boost: 0, chance: 0.5, color: 'uncommon' },
+  { key: 'fine', label: 'Fine', boost: 0.1, chance: 0.15, color: 'rare' },
+  { key: 'great', label: 'Great', boost: 0.2, chance: 0.07, color: 'epic' },
+  { key: 'masterwork', label: 'Masterwork', boost: 0.35, chance: 0.03, color: 'legendary', affix: true },
+];
+
+const professionPerks = {
+  blacksmithing: [
+    { level: 10, desc: '+5% chance to craft Fine or higher gear.' },
+    { level: 20, desc: '+10% chance to craft Fine or higher gear.' },
+    { level: 35, desc: '+1 socket on crafted weapons.' },
+    { level: 50, desc: 'Crafting gear has a chance to roll Masterwork twice.' },
+  ],
+  cooking: [
+    { level: 10, desc: 'Meals last +1 battle.' },
+    { level: 20, desc: 'Food grants +5% loot chance.' },
+    { level: 35, desc: 'Food buffs gain +10% potency.' },
+    { level: 50, desc: 'Legendary feasts last an extra battle.' },
+  ],
+  enchanting: [
+    { level: 10, desc: '+5% chance to add a minor stat on enchant.' },
+    { level: 20, desc: 'Affix enchants can add small crit bonuses.' },
+    { level: 35, desc: 'Upgrade attempts gain +5% success.' },
+    { level: 50, desc: 'Chance to add a second enchant automatically.' },
+  ],
+  dragonHandling: [
+    { level: 10, desc: 'Eggs hatch 10% faster.' },
+    { level: 20, desc: 'Dragons roll +5% better stats.' },
+    { level: 25, desc: 'Eggs hatch 20% faster.' },
+    { level: 50, desc: 'Dragons gain +1 bonus passive slot.' },
+  ],
+  dragonBonding: [
+    { level: 10, desc: 'Dragons provide +2% more bonuses.' },
+    { level: 20, desc: 'Dragon damage procs +5% more often.' },
+    { level: 35, desc: 'Dragons may shield for a small barrier.' },
+    { level: 50, desc: 'Dragons double their rare passive chance.' },
+  ],
+  trading: [
+    { level: 10, desc: 'Shops show one extra slot.' },
+    { level: 20, desc: '+5% better prices.' },
+    { level: 35, desc: 'Chance to stock rare recipes.' },
+    { level: 50, desc: 'Legendary shop slot unlocked.' },
+  ],
+};
+
+const gemCatalog = [
+  { id: 'ruby_t1', tier: 1, type: 'attack', stat: { attackPct: 0.04 }, color: 'rare' },
+  { id: 'ruby_t3', tier: 3, type: 'attack', stat: { attackPct: 0.08 }, color: 'epic' },
+  { id: 'sapphire_t2', tier: 2, type: 'element', stat: { elemental: 5 }, color: 'rare' },
+  { id: 'sapphire_t4', tier: 4, type: 'element', stat: { elemental: 12 }, color: 'epic' },
+  { id: 'emerald_t3', tier: 3, type: 'crit', stat: { crit: 5 }, color: 'epic' },
+  { id: 'topaz_t2', tier: 2, type: 'defense', stat: { defensePct: 0.06 }, color: 'uncommon' },
+  { id: 'amethyst_t5', tier: 5, type: 'shadow', stat: { lifesteal: 0.05, attackPct: 0.05 }, color: 'legendary' },
+];
+
+const runeCatalog = [
+  { id: 'rune_bleed', tier: 3, desc: 'Basic attacks have 10% chance to bleed.', modifier: { bleed: 0.1 }, rarity: 'epic' },
+  { id: 'rune_focus', tier: 2, desc: 'Skills cost 10% less resource.', modifier: { resourceDiscount: 0.1 }, rarity: 'rare' },
+  { id: 'rune_mastery', tier: 5, desc: 'Gain 5 rage when hit and +8% damage.', modifier: { fury: 0.05, attack: 0.08 }, rarity: 'legendary' },
+];
 
 const classData = {
   Warrior: { hp: 120, attack: 12, defense: 8, crit: 5, mana: 30, tag: 'melee' },
@@ -454,8 +568,10 @@ const state = {
   prestige: 0,
   lifeSkills: {},
   materials: {},
+  recipeUnlocks: {},
   foodBuff: null,
   selectedLifeSkill: 'mining',
+  socketSelection: null,
 };
 
 function createPlayer(cls) {
@@ -509,6 +625,10 @@ function ensureLifeSkills() {
     if (!state.lifeSkills[k]) state.lifeSkills[k] = { level: 1, currentXP: 0, xpToNext: 50 };
   });
   materialTemplates.forEach(mat => { if (!state.materials[mat]) state.materials[mat] = 0; });
+  if (!state.recipeUnlocks) state.recipeUnlocks = {};
+  Object.values(recipeBook).flat().forEach(rec => {
+    if (rec.autoUnlock && !state.recipeUnlocks[rec.id]) state.recipeUnlocks[rec.id] = true;
+  });
 }
 
 const playerHpBar = document.getElementById('hp-bar');
@@ -582,7 +702,7 @@ function generateItem(level, isBoss = false) {
     stats.push(rollStat(pick, level, rarity));
   }
   const name = `${rarity.label} ${slot.charAt(0).toUpperCase() + slot.slice(1)}`;
-  return { id: crypto.randomUUID(), type: 'gear', name, slot, rarity: rarity.key, stats, levelReq: Math.max(1, Math.floor(level * 0.8)), power: stats.reduce((t, s) => t + s.value, 0) };
+  return { id: crypto.randomUUID(), type: 'gear', name, slot, rarity: rarity.key, stats, levelReq: Math.max(1, Math.floor(level * 0.8)), power: stats.reduce((t, s) => t + s.value, 0), sockets: socketsFromRarity(rarity.key), gems: [] };
 }
 
 function rerollGear(item) {
@@ -594,12 +714,28 @@ function rerollGear(item) {
   item.name = `${item.name.split(' ')[0] || 'Refined'} ${item.slot}`;
 }
 
+function aggregateSockets(item) {
+  const bonus = { hp: 0, attack: 0, defense: 0, crit: 0, critdmg: 0, speed: 0, elemental: 0, attackPct: 0, defensePct: 0, hpPct: 0, loot: 0, lifesteal: 0 };
+  (item.gems || []).forEach(g => {
+    if (!g.gem || !g.gem.stat) return;
+    Object.entries(g.gem.stat).forEach(([k, v]) => { bonus[k] = (bonus[k] || 0) + v; });
+  });
+  if (item.rune && item.rune.modifier) {
+    Object.entries(item.rune.modifier).forEach(([k, v]) => { bonus[k] = (bonus[k] || 0) + v; });
+  }
+  return bonus;
+}
+
 function applyBonuses(baseStats, player) {
   const prestigeBonus = 1 + (state.prestige || 0) * 0.03;
   const gearStats = { hp: 0, attack: 0, defense: 0, crit: 0, critdmg: 0, speed: 0, elemental: 0 };
+  const gemFlat = { attackPct: 0, defensePct: 0, hpPct: 0, loot: 0, lifesteal: 0 };
   Object.values(player.equipment).forEach(item => {
     if (!item) return;
     item.stats.forEach(s => { gearStats[s.key] = (gearStats[s.key] || 0) + s.value; });
+    const socketStats = aggregateSockets(item);
+    ['hp', 'attack', 'defense', 'crit', 'critdmg', 'speed', 'elemental'].forEach(k => { gearStats[k] = (gearStats[k] || 0) + (socketStats[k] || 0); });
+    Object.keys(gemFlat).forEach(k => { gemFlat[k] = (gemFlat[k] || 0) + (socketStats[k] || 0); });
   });
   const dragonFactor = 1 + (player.modifiers.dragonBond || 0) + ((state.lifeSkills.dragonBonding ? state.lifeSkills.dragonBonding.level : 0) * 0.01);
   const dragonStats = state.activeDragon ? Object.fromEntries(Object.entries(state.activeDragon.bonus).map(([k, v]) => [k, Math.round(v * dragonFactor)])) : {};
@@ -607,16 +743,19 @@ function applyBonuses(baseStats, player) {
   const foodAtk = food && food.attack ? food.attack : 0;
   const foodHp = food && food.hp ? food.hp : 0;
   const foodCrit = food && food.crit ? food.crit : 0;
+  const foodDef = food && food.defense ? food.defense : 0;
+  const foodSpeed = food && food.speed ? food.speed : 0;
   const foodLoot = food && food.loot ? food.loot : 0;
   return {
-    maxHP: Math.round((baseStats.hp + (gearStats.hp || 0) + (dragonStats.hp || 0) + (player.flat.hp || 0)) * (1 + player.modifiers.hp + foodHp) * prestigeBonus),
-    attack: Math.round((baseStats.attack + (gearStats.attack || 0) + (dragonStats.attack || 0) + (player.flat.attack || 0)) * (1 + player.modifiers.attack + foodAtk) * prestigeBonus) + (player.flat.elemental || 0) + (dragonStats.elemental || 0),
-    defense: Math.round((baseStats.defense + (gearStats.defense || 0) + (dragonStats.defense || 0)) * (1 + player.modifiers.defense) * prestigeBonus),
+    maxHP: Math.round((baseStats.hp + (gearStats.hp || 0) + (dragonStats.hp || 0) + (player.flat.hp || 0)) * (1 + player.modifiers.hp + foodHp + (gemFlat.hpPct || 0)) * prestigeBonus),
+    attack: Math.round((baseStats.attack + (gearStats.attack || 0) + (dragonStats.attack || 0) + (player.flat.attack || 0)) * (1 + player.modifiers.attack + foodAtk + (gemFlat.attackPct || 0)) * prestigeBonus) + (player.flat.elemental || 0) + (dragonStats.elemental || 0),
+    defense: Math.round((baseStats.defense + (gearStats.defense || 0) + (dragonStats.defense || 0)) * (1 + player.modifiers.defense + foodDef + (gemFlat.defensePct || 0)) * prestigeBonus),
     crit: (baseStats.crit + (gearStats.crit || 0) + (dragonStats.crit || 0)) * (1 + player.modifiers.crit + foodCrit) * prestigeBonus,
     critdmg: 1.5 + (gearStats.critdmg || 0) / 100 + player.modifiers.critdmg + (dragonStats.critdmg || 0),
-    speed: (baseStats.speed || 0) + (gearStats.speed || 0) + (player.flat.speed || 0) + (dragonStats.speed || 0),
+    speed: (baseStats.speed || 0) + (gearStats.speed || 0) + (player.flat.speed || 0) + (dragonStats.speed || 0) + foodSpeed,
     elemental: (gearStats.elemental || 0) + (dragonStats.elemental || 0),
-    lootBuff: foodLoot,
+    lootBuff: foodLoot + (gemFlat.loot || 0),
+    lifesteal: gemFlat.lifesteal || 0,
   };
 }
 
@@ -1203,16 +1342,14 @@ function grantCombatMaterials(boss) {
   ensureLifeSkills();
   const huntingLevel = state.lifeSkills.hunting ? state.lifeSkills.hunting.level : 1;
   const bonusChance = 1 + huntingLevel * 0.03;
-  const drops = [
-    { id: 'Beast Hide', chance: 0.35 },
-    { id: 'Ancient Bone', chance: 0.25 },
-    { id: 'Fire Essence', chance: boss ? 0.3 : 0.1 },
-  ];
+  const zoneName = zones[state.currentZone] ? zones[state.currentZone].name : '';
+  const drops = materialCatalog.filter(m => (m.sourceType === 'enemy' || m.sourceType === 'hunting' || (boss && m.sourceType === 'boss')));
   drops.forEach(d => {
-    if (Math.random() < d.chance * bonusChance) {
+    const baseChance = d.dropRates && d.dropRates[zoneName] ? d.dropRates[zoneName] : 0.2;
+    if (Math.random() < baseChance * bonusChance) {
       const qty = 1 + Math.floor(Math.random() * Math.max(1, Math.floor(huntingLevel / 4)) + 1);
       addMaterial(d.id, qty);
-      logMessage(`You recover ${d.id} x${qty} from the battle.`);
+      logMessage(`You recover ${d.name} x${qty} from the battle.`);
     }
   });
 }
@@ -1341,7 +1478,7 @@ function gainLifeSkillXP(id, amount) {
   while (skill.currentXP >= skill.xpToNext) {
     skill.currentXP -= skill.xpToNext;
     skill.level += 1;
-    skill.xpToNext = Math.floor(skill.xpToNext * 1.32 + 8);
+    skill.xpToNext = Math.floor(skill.xpToNext * 1.28 + 12);
     leveled = true;
   }
   if (leveled) logMessage(`${lifeSkillDefs[id].name} reached level ${skill.level}!`);
@@ -1356,14 +1493,18 @@ function performLifeAction(skillId, action) {
   const skill = state.lifeSkills[skillId];
   const levelBonus = 1 + skill.level * 0.02;
   let gained = [];
+  const zoneName = zones[state.currentZone] ? zones[state.currentZone].name : '';
   action.rewards.forEach(rew => {
-    if (Math.random() < rew.chance * levelBonus) {
+    const mat = materialCatalog.find(m => m.id === rew.id);
+    const zoneBonus = mat && mat.dropRates && zoneName && mat.dropRates[zoneName] ? 1 + mat.dropRates[zoneName] * 0.5 : 1;
+    if (Math.random() < rew.chance * levelBonus * zoneBonus) {
       const qty = Math.max(1, Math.floor(Math.random() * (rew.max - rew.min + 1)) + rew.min);
       addMaterial(rew.id, qty);
-      gained.push(`${rew.id} x${qty}`);
+      gained.push(`${mat ? mat.name : rew.id} x${qty}`);
     }
   });
   gainLifeSkillXP(skillId, action.xp);
+  rollRecipeDiscovery(skillId);
   const msg = gained.length ? `You practice ${lifeSkillDefs[skillId].name} and gain ${gained.join(', ')}.` : `You practice ${lifeSkillDefs[skillId].name} but find nothing.`;
   logMessage(msg);
   updateAll();
@@ -1372,28 +1513,97 @@ function performLifeAction(skillId, action) {
 function craftRecipe(skillId, recipe) {
   const skill = state.lifeSkills[skillId];
   if (skill.level < (recipe.skillReq || 1)) { logMessage('Skill level too low.'); return; }
+  if (!state.recipeUnlocks[recipe.id]) { logMessage('Recipe not learned yet.'); return; }
   const missing = Object.entries(recipe.mats).find(([m, qty]) => (state.materials[m] || 0) < qty);
   if (missing) { logMessage(`Need more ${missing[0]}.`); return; }
   Object.entries(recipe.mats).forEach(([m, qty]) => { state.materials[m] -= qty; });
   gainLifeSkillXP(skillId, 18 + recipe.skillReq * 2);
   if (recipe.type === 'gear') {
-    const item = { id: crypto.randomUUID(), type: 'gear', name: recipe.name, slot: recipe.slot, rarity: recipe.rarity, stats: recipe.stats, levelReq: recipe.levelReq, power: recipe.stats.reduce((t, s) => t + s.value, 0) };
+    const quality = rollQuality(skill);
+    const stats = recipe.stats.map(s => ({ ...s, value: Math.max(1, Math.round(s.value * (1 + quality.boost))) }));
+    const socketBonus = getPerkBonus('blacksmithing', skill.level, 35) ? 1 : 0;
+    const item = { id: crypto.randomUUID(), type: 'gear', name: `${quality.label} ${recipe.name}`, slot: recipe.slot, rarity: recipe.rarity, stats, levelReq: recipe.levelReq, power: stats.reduce((t, s) => t + s.value, 0), quality: quality.key, sockets: (recipe.sockets || 0) + socketBonus, gems: [] };
+    if (!item.sockets) item.sockets = socketsFromRarity(item.rarity);
+    if (quality.affix) item.affix = 'Bonus affix';
     state.inventory.push(item);
-    logMessage(`You craft ${recipe.name}.`);
+    logMessage(`You craft ${item.name}.`);
   } else if (recipe.type === 'potion') {
     const item = { id: crypto.randomUUID(), type: 'potion', name: recipe.name, rarity: recipe.rarity, heal: recipe.heal || 0, price: 25 };
     if (recipe.buff) item.buff = recipe.buff;
     state.inventory.push(item);
     logMessage(`You brew ${recipe.name}.`);
   } else if (recipe.type === 'food') {
-    const food = { id: crypto.randomUUID(), type: 'food', name: recipe.name, rarity: recipe.rarity, buff: recipe.buff, price: 20 };
+    const perkedBuff = applyFoodPerks(recipe.buff, skill.level);
+    const food = { id: crypto.randomUUID(), type: 'food', name: recipe.name, rarity: recipe.rarity, buff: perkedBuff, price: 20 };
     state.inventory.push(food);
     logMessage(`You cook ${recipe.name}.`);
   } else if (recipe.type === 'enchant') {
     renderEnchantSelection(recipe);
     return;
+  } else if (recipe.type === 'rune') {
+    const runeDef = runeCatalog.find(r => r.id === (recipe.output || {}).runeId) || runeCatalog.find(r => r.id === 'rune_focus');
+    const runeItem = { id: crypto.randomUUID(), type: 'rune', rarity: runeDef.rarity, name: `Rune: ${runeDef.id}`, rune: runeDef };
+    state.inventory.push(runeItem);
+    logMessage(`You inscribe ${runeItem.name}.`);
+  } else if (recipe.type === 'gem') {
+    const gemDef = gemCatalog.find(g => g.id === (recipe.output || {}).gemId);
+    if (gemDef) {
+      const gemItem = { id: crypto.randomUUID(), type: 'gem', name: `Gem: ${gemDef.id}`, rarity: gemDef.color, gem: gemDef };
+      state.inventory.push(gemItem);
+      logMessage(`You cut ${gemItem.name}.`);
+    }
   }
   updateAll();
+}
+
+function rollQuality(skill) {
+  let roll = Math.random();
+  const tiered = qualityTiers.map(q => ({ ...q }));
+  const perkBonus = getPerkBonus('blacksmithing', skill.level, 20) ? 0.1 : 0;
+  if (perkBonus) tiered.forEach(q => { if (['fine', 'great', 'masterwork'].includes(q.key)) q.chance += perkBonus * 0.5; });
+  const total = tiered.reduce((t, q) => t + q.chance, 0);
+  let current = 0;
+  for (const q of tiered) {
+    current += q.chance / total;
+    if (roll <= current) return q;
+  }
+  return qualityTiers[1];
+}
+
+function socketsFromRarity(rarity) {
+  switch (rarity) {
+    case 'uncommon': return 1;
+    case 'rare': return 1 + Math.round(Math.random());
+    case 'epic': return 2;
+    case 'legendary': return 3;
+    default: return 0;
+  }
+}
+
+function rollRecipeDiscovery(skillId) {
+  const unknown = (recipeBook[skillId] || []).filter(r => !state.recipeUnlocks[r.id]);
+  if (!unknown.length) return;
+  const chance = 0.08 + state.lifeSkills[skillId].level * 0.002;
+  if (Math.random() < chance) {
+    const found = unknown[Math.floor(Math.random() * unknown.length)];
+    state.recipeUnlocks[found.id] = true;
+    logMessage(`You discover the recipe for ${found.name}!`);
+  }
+}
+
+function applyFoodPerks(buff, level) {
+  const extraBattles = getPerkBonus('cooking', level, 10) ? 1 : 0;
+  const potency = getPerkBonus('cooking', level, 35) ? 1.1 : 1;
+  const tuned = { ...buff };
+  if (tuned.duration) tuned.duration += extraBattles;
+  if (tuned.attack) tuned.attack *= potency;
+  if (tuned.crit) tuned.crit *= potency;
+  if (tuned.loot) tuned.loot *= potency;
+  return tuned;
+}
+
+function getPerkBonus(skillId, level, threshold) {
+  return level >= threshold;
 }
 
 function renderEnchantSelection(recipe) {
@@ -1405,8 +1615,22 @@ function renderEnchantSelection(recipe) {
     const btn = document.createElement('button');
     btn.textContent = item.name;
     btn.onclick = () => {
-      rerollGear(item);
-      logMessage(`${recipe.name} refreshes ${item.name}.`);
+      if (recipe.effect === 'reroll') {
+        rerollGear(item);
+        logMessage(`${recipe.name} refreshes ${item.name}.`);
+      } else if (recipe.effect === 'small') {
+        const stat = statPool[Math.floor(Math.random() * statPool.length)];
+        item.stats.push({ key: stat.key, label: stat.label, value: 3 });
+        logMessage(`${recipe.name} adds a minor ${stat.label} bonus.`);
+      } else if (recipe.effect === 'affix') {
+        item.stats.push({ key: 'attack', label: 'Attack', value: 6 });
+        logMessage(`${recipe.name} adds an offensive affix.`);
+      } else if (recipe.effect === 'upgrade') {
+        const next = rarities[Math.min(rarities.length - 1, rarities.findIndex(r => r.key === item.rarity) + 1)];
+        item.rarity = next.key;
+        item.name = `${next.label} ${item.name}`;
+        logMessage(`${recipe.name} reforges ${item.name} to ${next.label}.`);
+      }
       updateAll();
     };
     chooser.appendChild(btn);
@@ -1435,6 +1659,13 @@ function generateShop() {
   egg.type = 'egg';
   egg.price = valueFromEgg(egg) * 2;
   state.shop.push(egg);
+  if (tradeLevel >= 35) {
+    const locked = Object.values(recipeBook).flat().filter(r => !state.recipeUnlocks[r.id]);
+    if (locked.length) {
+      const pick = locked[Math.floor(Math.random() * locked.length)];
+      state.shop.push({ id: crypto.randomUUID(), type: 'recipe', recipeId: pick.id, name: `Recipe: ${pick.name}`, rarity: pick.rarity, price: 80 });
+    }
+  }
 }
 
 function renderShop() {
@@ -1449,6 +1680,8 @@ function renderShop() {
       card.innerHTML = `<div class="name ${item.rarity}">${item.name}</div><div class="small">Heals ${item.heal} HP</div><div class="small">${item.price} gold</div>`;
     } else if (item.type === 'egg') {
       card.innerHTML = `<div class="name ${item.rarity}">${item.rarity} Egg</div><div class="small">Hatching ${item.progress}/${item.requirement}</div><div class="small">${item.price} gold</div>`;
+    } else if (item.type === 'recipe') {
+      card.innerHTML = `<div class="name ${item.rarity || 'rare'}">${item.name}</div><div class="small">Unlocks crafting entry</div><div class="small">${item.price} gold</div>`;
     } else {
       card.innerHTML = `<div class="name ${item.rarity}">${item.name}</div><div class="small">Lv ${item.levelReq} • ${item.slot}</div>`;
       (item.stats || []).forEach(s => {
@@ -1481,6 +1714,12 @@ function buyShopItem(item) {
     state.inventory.push(item);
   } else if (item.type === 'egg') {
     state.eggs.push(item);
+  } else if (item.type === 'recipe') {
+    const rec = Object.values(recipeBook).flat().find(r => r.id === item.recipeId);
+    if (rec) {
+      state.recipeUnlocks[rec.id] = true;
+      logMessage(`Recipe ${rec.name} learned!`);
+    }
   }
   logMessage(`Purchased ${item.name || item.rarity + ' egg'} for ${finalPrice}.`);
   updateAll();
@@ -1525,6 +1764,25 @@ function renderEquipment() {
       const stats = item.stats.map(s => `<div class="small">+${s.value} ${s.label}</div>`).join('');
       const info = document.createElement('div');
       info.innerHTML = stats;
+      const socketInfo = document.createElement('div');
+      const openSockets = Math.max(0, (item.sockets || 0) - (item.gems ? item.gems.length : 0));
+      socketInfo.className = 'small';
+      socketInfo.textContent = `Sockets: ${(item.sockets || 0)} (open ${openSockets})`;
+      info.appendChild(socketInfo);
+      if (item.gems && item.gems.length) {
+        item.gems.forEach(g => {
+          const gemRow = document.createElement('div');
+          gemRow.className = 'tiny';
+          gemRow.textContent = `• ${g.name || g.gem?.id}`;
+          info.appendChild(gemRow);
+        });
+      }
+      if (item.rune) {
+        const runeRow = document.createElement('div');
+        runeRow.className = 'tiny';
+        runeRow.textContent = `Rune: ${item.rune.id}`;
+        info.appendChild(runeRow);
+      }
       div.appendChild(info);
     }
     wrap.appendChild(div);
@@ -1565,6 +1823,18 @@ function renderInventory() {
       row.appendChild(eatBtn);
       row.appendChild(sellBtn);
       card.appendChild(row);
+    } else if (item.type === 'gem' || item.type === 'rune') {
+      card.innerHTML = `<div class="name ${item.rarity}">${item.name}</div><div class="small">Socket into gear</div>`;
+      const row = document.createElement('div');
+      const socketBtn = document.createElement('button');
+      socketBtn.textContent = 'Select';
+      socketBtn.onclick = (e) => { e.stopPropagation(); selectSocketItem(item); };
+      const sellBtn = document.createElement('button');
+      sellBtn.textContent = `Sell (${valueFromItem(item)}g)`;
+      sellBtn.onclick = (e) => { e.stopPropagation(); sellItem(item); };
+      row.appendChild(socketBtn);
+      row.appendChild(sellBtn);
+      card.appendChild(row);
     } else {
       const better = isBetterThanEquipped(item);
       const arrow = better ? '<span class="better-arrow">↑</span>' : '';
@@ -1590,10 +1860,57 @@ function renderInventory() {
   });
 }
 
+function renderSocketPanel() {
+  const wrap = document.getElementById('socket-panel');
+  if (!wrap) return;
+  if (!state.player) { wrap.innerHTML = ''; return; }
+  wrap.innerHTML = '<h4>Gems, Runes & Augments</h4>';
+  if (state.socketSelection) {
+    const sel = state.socketSelection;
+    wrap.innerHTML += `<div class="small">Selected: ${sel.name}</div>`;
+  }
+  Object.entries(state.player.equipment).forEach(([slot, item]) => {
+    if (!item) return;
+    const open = Math.max(0, (item.sockets || 0) - (item.gems ? item.gems.length : 0));
+    const card = document.createElement('div');
+    card.className = 'socket-card';
+    card.innerHTML = `<div class="flex"><strong>${slot.toUpperCase()}</strong><span class="small">${item.name}</span></div><div class="small">Sockets: ${item.sockets || 0} (open ${open})</div>`;
+    const btn = document.createElement('button');
+    btn.textContent = 'Apply selection';
+    btn.disabled = !state.socketSelection;
+    btn.onclick = () => socketInto(item);
+    card.appendChild(btn);
+    wrap.appendChild(card);
+  });
+}
+
+function selectSocketItem(item) {
+  state.socketSelection = item;
+  renderSocketPanel();
+}
+
+function socketInto(gear) {
+  const sel = state.socketSelection;
+  if (!sel) { logMessage('Select a gem or rune first.'); return; }
+  if (sel.type === 'gem') {
+    const open = Math.max(0, (gear.sockets || 0) - (gear.gems ? gear.gems.length : 0));
+    if (open <= 0) { logMessage('No open sockets on this gear.'); return; }
+    gear.gems = gear.gems || [];
+    gear.gems.push(sel);
+  } else if (sel.type === 'rune') {
+    gear.rune = sel.rune;
+  }
+  state.inventory = state.inventory.filter(i => i.id !== sel.id);
+  state.socketSelection = null;
+  logMessage('Socket applied!');
+  updateAll();
+}
+
 function valueFromItem(item) {
   if (item.type === 'potion') return Math.max(5, Math.round(item.price * 0.5));
   if (item.type === 'food') return Math.max(5, Math.round((item.price || 15) * 0.5));
   if (item.type === 'egg') return valueFromEgg(item);
+  if (item.type === 'gem' || item.type === 'rune') return 25 + (item.gem ? item.gem.tier * 10 : 10);
   return Math.max(5, Math.round((item.power || 5) * 1.5));
 }
 
@@ -1800,10 +2117,11 @@ function renderMaterials() {
   matWrap.innerHTML = '<h5>Materials</h5>';
   const grid = document.createElement('div');
   grid.className = 'materials';
-  Object.entries(state.materials).forEach(([id, qty]) => {
+  materialCatalog.forEach(mat => {
+    const qty = state.materials[mat.id] || 0;
     const div = document.createElement('div');
-    div.className = 'material';
-    div.textContent = `${id}: ${qty}`;
+    div.className = `material rarity-${mat.rarityColor}`;
+    div.innerHTML = `<div class="flex"><strong>${mat.name}</strong><span class="small">Tier ${mat.tier}</span></div><div class="small">${qty} owned</div><div class="tiny">${mat.description}</div>`;
     grid.appendChild(div);
   });
   matWrap.appendChild(grid);
@@ -1842,20 +2160,72 @@ function renderLifeActions() {
   }
   const recipes = recipeBook[id] || [];
   recipes.forEach(rec => {
+    const learned = !!state.recipeUnlocks[rec.id];
     const card = document.createElement('div');
-    card.className = `recipe-card rarity-${rec.rarity}`;
-    card.innerHTML = `<div class="flex"><strong>${rec.name}</strong><span class="small">Req Lv ${rec.skillReq}</span></div><div class="small">${rec.desc}</div>`;
+    card.className = `recipe-card rarity-${rec.rarity} ${learned ? '' : 'locked'}`;
+    card.innerHTML = `<div class="flex"><strong>${rec.name}</strong><span class="small">Lv ${rec.skillReq} • Tier ${rec.tier}</span></div><div class="small">${rec.desc}</div>`;
     const matList = document.createElement('div');
     matList.className = 'small';
-    matList.textContent = 'Mats: ' + Object.entries(rec.mats).map(([m, q]) => `${m} x${q}`).join(', ');
+    matList.textContent = 'Mats: ' + Object.entries(rec.mats).map(([m, q]) => `${(materialCatalog.find(x => x.id === m)?.name) || m} x${q}`).join(', ');
     card.appendChild(matList);
     const btn = document.createElement('button');
-    btn.textContent = 'Craft';
+    btn.textContent = learned ? 'Craft' : 'Locked';
+    btn.disabled = !learned;
     btn.onclick = () => craftRecipe(id, rec);
     card.appendChild(btn);
     recipeWrap.appendChild(card);
   });
   if (!recipes.length) recipeWrap.innerHTML = '<div class="small">No recipes yet.</div>';
+
+  if (id === 'blacksmithing' || id === 'mining') {
+    renderRefinement();
+  } else {
+    const refine = document.getElementById('refine-panel');
+    if (refine) refine.innerHTML = '';
+  }
+  renderPerksPanel(id);
+}
+
+function renderRefinement() {
+  const refine = document.getElementById('refine-panel');
+  if (!refine) return;
+  refine.innerHTML = '<h5>Refine Materials</h5>';
+  refineChains.forEach(chain => {
+    const have = state.materials[chain.input] || 0;
+    const can = Math.floor(have / chain.ratio);
+    const matName = materialCatalog.find(m => m.id === chain.input)?.name || chain.input;
+    const outName = materialCatalog.find(m => m.id === chain.output)?.name || chain.output;
+    const card = document.createElement('div');
+    card.className = 'recipe-card';
+    card.innerHTML = `<div class="flex"><strong>${matName} → ${outName}</strong><span class="small">${chain.ratio}:1</span></div><div class="small">You can make ${can}</div>`;
+    const btn = document.createElement('button');
+    btn.textContent = 'Refine 1';
+    btn.disabled = can <= 0;
+    btn.onclick = () => {
+      state.materials[chain.input] -= chain.ratio;
+      addMaterial(chain.output, 1);
+      gainLifeSkillXP('mining', chain.xp);
+      updateAll();
+    };
+    card.appendChild(btn);
+    refine.appendChild(card);
+  });
+}
+
+function renderPerksPanel(skillId) {
+  const panel = document.getElementById('perk-panel');
+  if (!panel) return;
+  panel.innerHTML = '<h5>Perks</h5>';
+  const perks = professionPerks[skillId] || [];
+  const ul = document.createElement('div');
+  perks.forEach(p => {
+    const row = document.createElement('div');
+    const unlocked = state.lifeSkills[skillId].level >= p.level;
+    row.className = `perk ${unlocked ? 'unlocked' : ''}`;
+    row.textContent = `Lv ${p.level}: ${p.desc}`;
+    ul.appendChild(row);
+  });
+  panel.appendChild(ul);
 }
 
 function purchaseSkill(key, skill) {
@@ -1912,6 +2282,7 @@ function updateAll() {
   renderZones();
   renderEquipment();
   renderInventory();
+  renderSocketPanel();
   renderDragonTab();
   renderSkills();
   renderLifeSkillsTab();
@@ -1950,6 +2321,7 @@ function resetGame() {
   state.prestige = 0;
   state.lifeSkills = defaultLifeSkills();
   state.materials = {};
+  state.recipeUnlocks = {};
   state.foodBuff = null;
   document.getElementById('class-select').style.display = 'flex';
   setupClassSelection();
@@ -1967,6 +2339,7 @@ function saveGame() {
     prestige: state.prestige,
     lifeSkills: state.lifeSkills,
     materials: state.materials,
+    recipeUnlocks: state.recipeUnlocks,
     foodBuff: state.foodBuff,
   };
   localStorage.setItem('rpgSave', JSON.stringify(data));
@@ -1978,8 +2351,9 @@ function loadGame() {
     const parsed = JSON.parse(data);
     state.player = parsed.player;
     ensureModifierDefaults(state.player);
+    Object.values(state.player.equipment || {}).forEach(it => { if (it && !it.gems) it.gems = []; });
     state.inventory = parsed.inventory || [];
-    state.inventory.forEach(it => { if (!it.type) it.type = 'gear'; });
+    state.inventory.forEach(it => { if (!it.type) it.type = 'gear'; if (!it.gems) it.gems = []; });
     state.eggs = parsed.eggs || [];
     state.activeDragon = parsed.activeDragon || null;
     state.currentZone = parsed.currentZone || 0;
@@ -1989,6 +2363,7 @@ function loadGame() {
     state.lifeSkills = parsed.lifeSkills || defaultLifeSkills();
     state.materials = parsed.materials || {};
     state.foodBuff = parsed.foodBuff || null;
+    state.recipeUnlocks = parsed.recipeUnlocks || {};
     ensureLifeSkills();
     return true;
   }
