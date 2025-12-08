@@ -1,9 +1,6 @@
 // Simple RNG Looter RPG built with vanilla JS
 // Systems: combat, loot, skills, dragons, events, saving
 
-const ENEMY_SCALE = 2;
-const ENEMY_ATTACK_MOD = 5 / 6; // global reduction to enemy attack power
-
 const rarities = [
   { key: 'common', label: 'Common', color: 'common', weight: 70, stats: [1, 2], scale: 1 },
   { key: 'uncommon', label: 'Uncommon', color: 'uncommon', weight: 22, stats: [2, 3], scale: 1.08 },
