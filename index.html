@@ -33,8 +33,15 @@
     <section class="panel">
       <h3>Zones</h3>
       <div id="zone-list"></div>
-      <button id="fight-btn">Fight!</button>
-      <button id="boss-btn">Fight Boss</button>
+      <div class="zone-controls">
+        <div class="auto-row">
+          <label for="auto-count" class="small">Auto battles</label>
+          <input id="auto-count" type="number" min="1" max="10" value="3">
+        </div>
+        <button id="fight-btn">Fight!</button>
+        <button id="boss-btn">Fight Boss</button>
+        <button id="auto-btn">Auto Battle</button>
+      </div>
       <div id="event-area" class="event"></div>
     </section>
 
@@ -52,21 +59,60 @@
         <button data-tab="inventory">Inventory</button>
         <button data-tab="dragons">Dragons</button>
         <button data-tab="skills">Skill Tree</button>
+        <button data-tab="shop">Shop</button>
       </div>
       <div id="tab-content">
         <div id="equipment" class="tab active">
           <div id="equipment-slots"></div>
         </div>
         <div id="inventory" class="tab">
+          <div class="filters">
+            <label>Slot
+              <select id="filter-slot">
+                <option value="all">All</option>
+                <option value="weapon">Weapon</option>
+                <option value="armor">Armor</option>
+                <option value="helmet">Helmet</option>
+                <option value="boots">Boots</option>
+                <option value="accessory">Accessory</option>
+              </select>
+            </label>
+            <label>Rarity
+              <select id="filter-rarity">
+                <option value="all">All</option>
+                <option value="common">Common</option>
+                <option value="uncommon">Uncommon</option>
+                <option value="rare">Rare</option>
+                <option value="epic">Epic</option>
+                <option value="legendary">Legendary</option>
+              </select>
+            </label>
+            <label>Type
+              <select id="filter-type">
+                <option value="all">All</option>
+                <option value="gear">Gear</option>
+                <option value="potion">Healing</option>
+                <option value="egg">Egg</option>
+              </select>
+            </label>
+          </div>
           <div id="inventory-list"></div>
         </div>
         <div id="dragons" class="tab">
           <div id="egg-list"></div>
           <div id="active-dragon"></div>
+          <div id="combine-area"></div>
         </div>
         <div id="skills" class="tab">
           <div id="skill-points"></div>
           <div id="skill-tree"></div>
+        </div>
+        <div id="shop" class="tab">
+          <div class="shop-header">
+            <button id="refresh-shop">Refresh Wares</button>
+            <div id="shop-timer" class="small"></div>
+          </div>
+          <div id="shop-list" class="shop-grid"></div>
         </div>
       </div>
     </section>

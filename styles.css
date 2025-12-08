@@ -88,6 +88,7 @@ body {
 .tab { display: none; }
 .tab.active { display: block; }
 #equipment-slots, #inventory-list, #egg-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); gap: 8px; }
+.shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px,1fr)); gap: 8px; }
 .item, .slot, .egg, .dragon-card, .skill-node {
   background: #101725;
   border: 1px solid #2a3650;
@@ -95,6 +96,7 @@ body {
   border-radius: 6px;
   position: relative;
 }
+.shop-card { display: flex; flex-direction: column; gap: 4px; }
 .slot { min-height: 70px; }
 .rarity-common { border-color: var(--common); }
 .rarity-uncommon { border-color: var(--uncommon); }
@@ -134,6 +136,13 @@ body {
   border-left: 4px solid #455a64;
 }
 .skill-node.unlocked { border-color: #66bb6a; box-shadow: 0 0 8px rgba(102,187,106,0.4); }
+.filters { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; }
+.filters label { font-size: 12px; color: #dce1f0; display: flex; flex-direction: column; gap: 4px; }
+.filters select { background: #0d1422; color: var(--text); border: 1px solid #2e3c54; padding: 4px; border-radius: 4px; }
+.zone-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px,1fr)); gap: 6px; }
+.zone-controls .auto-row { display: flex; flex-direction: column; gap: 4px; }
+.shop-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.shop-header button { margin-right: 6px; }
 .event { margin-top: 10px; background: #0b111c; padding: 8px; border-radius: 6px; min-height: 80px; }
 .event button { margin-right: 4px; }
 @media (max-width: 900px) {
