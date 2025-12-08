@@ -1,0 +1,174 @@
+:root {
+  --common: #b0b0b0;
+  --uncommon: #4caf50;
+  --rare: #2196f3;
+  --epic: #9c27b0;
+  --legendary: #ff9800;
+  --bg: #0f1624;
+  --panel: #1c2433;
+  --text: #f4f4f4;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: 'Segoe UI', Tahoma, sans-serif;
+  background: radial-gradient(circle at 20% 20%, #1c2942, #0b101b 60%);
+  color: var(--text);
+}
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: #111827;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.bars { width: 40%; }
+.bar {
+  position: relative;
+  background: #2a3347;
+  border: 1px solid #3a4460;
+  border-radius: 6px;
+  margin: 4px 0;
+  height: 18px;
+  overflow: hidden;
+}
+.bar .fill {
+  background: linear-gradient(90deg, #e53935, #ff7043);
+  width: 50%;
+  height: 100%;
+}
+.bar.mana .fill { background: linear-gradient(90deg, #0080ff, #00e6e6); }
+.bar.enemy .fill { background: linear-gradient(90deg, #26c6da, #1565c0); }
+.bar.enemy.boss .fill { background: linear-gradient(90deg, #8e2de2, #4a00e0); }
+.bar.xp .fill { background: linear-gradient(90deg, #43a047, #7cb342); }
+.bar span {
+  position: absolute;
+  left: 50%; transform: translateX(-50%);
+  font-size: 12px;
+  top: 0; line-height: 18px;
+}
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr 1fr;
+  gap: 10px;
+  padding: 10px;
+}
+.panel {
+  background: var(--panel);
+  border: 1px solid #2b3548;
+  border-radius: 8px;
+  padding: 10px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.35);
+  min-height: 70vh;
+}
+.panel h3 { margin-top: 0; }
+.center { display: flex; flex-direction: column; }
+#enemy-display { font-size: 18px; margin-bottom: 8px; }
+.log {
+  flex: 1;
+  background: #0b111c;
+  border: 1px solid #2b3548;
+  padding: 8px;
+  border-radius: 6px;
+  overflow-y: auto;
+}
+.log .crit { color: #f6ad55; font-weight: bold; }
+.log .status { color: #63b3ed; }
+.log .boss { color: #f472b6; }
+.status-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 8px 0; }
+.status-icons { display: flex; gap: 6px; flex-wrap: wrap; min-height: 20px; }
+.status-icons .icon { padding: 4px 6px; border-radius: 6px; background: #1b2335; border: 1px solid #2d3a52; font-size: 11px; }
+.status-icons .dot { color: #f56565; }
+.status-icons .buff { color: #68d391; }
+.status-icons .debuff { color: #ed8936; }
+.status-icons .cc { color: #90cdf4; }
+.info { margin-bottom: 8px; color: #cfcfcf; }
+#action-panel { display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 10px; }
+#skill-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); gap: 6px; }
+#action-panel button { width: 100%; }
+.skill-btn { position: relative; }
+.skill-btn.disabled { opacity: 0.45; cursor: not-allowed; }
+.skill-btn .cooldown { position: absolute; top: 2px; right: 4px; font-size: 10px; }
+.label { font-weight: 600; }
+.tabs { display: flex; gap: 4px; margin-bottom: 6px; }
+.tabs button {
+  flex: 1;
+  padding: 6px;
+  background: #162032;
+  border: 1px solid #2d3a52;
+  color: var(--text);
+  cursor: pointer;
+  border-radius: 6px;
+}
+.tabs button.active { border-color: #66bb6a; box-shadow: 0 0 6px rgba(102,187,106,0.4); }
+.tab { display: none; }
+.tab.active { display: block; }
+.better-arrow { color: #3cb371; font-weight: bold; margin-left: 6px; }
+#equipment-slots, #inventory-list, #egg-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); gap: 8px; }
+.shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px,1fr)); gap: 8px; }
+.item, .slot, .egg, .dragon-card, .skill-node {
+  background: #101725;
+  border: 1px solid #2a3650;
+  padding: 6px;
+  border-radius: 6px;
+  position: relative;
+}
+.shop-card { display: flex; flex-direction: column; gap: 4px; }
+.slot { min-height: 70px; }
+.rarity-common { border-color: var(--common); }
+.rarity-uncommon { border-color: var(--uncommon); }
+.rarity-rare { border-color: var(--rare); }
+.rarity-epic { border-color: var(--epic); }
+.rarity-legendary { border-color: var(--legendary); }
+.name.common { color: var(--common); }
+.name.uncommon { color: var(--uncommon); }
+.name.rare { color: var(--rare); }
+.name.epic { color: var(--epic); }
+.name.legendary { color: var(--legendary); }
+.small { font-size: 12px; color: #b9c1d6; }
+.flex { display: flex; justify-content: space-between; }
+.modal {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.8);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 20;
+}
+.modal-content {
+  background: #111827;
+  padding: 20px;
+  border-radius: 10px;
+  width: 420px;
+}
+.class-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 10px; }
+.class-card {
+  padding: 10px;
+  border: 1px solid #2e3c54;
+  border-radius: 8px;
+  background: #0d1422;
+  cursor: pointer;
+}
+.skill-branch { margin-bottom: 10px; }
+.skill-node {
+  cursor: pointer;
+  border-left: 4px solid #455a64;
+}
+.skill-node.unlocked { border-color: #66bb6a; box-shadow: 0 0 8px rgba(102,187,106,0.4); }
+.filters { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; }
+.filters label { font-size: 12px; color: #dce1f0; display: flex; flex-direction: column; gap: 4px; }
+.filters select { background: #0d1422; color: var(--text); border: 1px solid #2e3c54; padding: 4px; border-radius: 4px; }
+.filters .wide { align-self: flex-end; padding: 6px 10px; background: #1f2a3f; color: var(--text); border: 1px solid #2d3a52; border-radius: 6px; cursor: pointer; }
+.zone-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px,1fr)); gap: 6px; }
+.zone-controls .auto-row { display: flex; flex-direction: column; gap: 4px; }
+.shop-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.shop-header button { margin-right: 6px; }
+.event { margin-top: 10px; background: #0b111c; padding: 8px; border-radius: 6px; min-height: 80px; }
+.event button { margin-right: 4px; }
+.better-arrow { color: #66bb6a; font-weight: bold; margin-left: 4px; }
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; }
+  .bars { width: 100%; }
+}
