@@ -1122,7 +1122,7 @@ const ACTIONS = {
   BOND: { id: 'BOND', label: 'Bond Dragon', baseCooldownMs: 6 * 60 * 1000 },
   TRADE: { id: 'TRADE', label: 'Trade', baseCooldownMs: 4 * 60 * 1000 },
   FIGHT: { id: 'FIGHT', label: 'Fight', baseCooldownMs: 30 * 1000 },
-  AUTO_BATTLE: { id: 'AUTO_BATTLE', label: 'Auto Battle', baseCooldownMs: 30 * 1000 },
+  AUTO_BATTLE: { id: 'AUTO_BATTLE', label: 'Auto Battle', baseCooldownMs: 15 * 1000 },
   ADVENTURE: { id: 'ADVENTURE', label: 'Adventure', baseCooldownMs: 10 * 60 * 1000 },
   WORK: { id: 'WORK', label: 'Work Job', baseCooldownMs: 60 * 60 * 1000 },
   TRAIN: { id: 'TRAIN', label: 'Train', baseCooldownMs: 45 * 60 * 1000 },
@@ -2341,13 +2341,103 @@ function startFight(boss = false, auto = false, opts = {}) {
   });
 }
 
-function autoBattle(boss = false) {
+function calculateSimDamage(attacker, defender) {
+  const variance = 0.1;
+  let raw = attacker.attack * (1 + ((Math.random() * 2 - 1) * variance));
+  let dmg = Math.max(1, Math.round(raw - (defender.defense || 0) * 0.6));
+  const critChance = attacker.crit || 0;
+  const crit = Math.random() * 100 < critChance;
+  if (crit) dmg = Math.round(dmg * (attacker.critdmg || 1.5));
+  const elementMult = getElementMultiplier(attacker.element || 'physical', defender.element || 'physical');
+  dmg = Math.round(dmg * elementMult);
+  return Math.max(1, dmg);
+}
+
+function simulateAutoFight(playerStats, startingHP, zone) {
+  const enemy = pickEnemy(zone, false);
+  const enemyStats = { attack: enemy.attack, defense: enemy.defense, element: enemy.element || zone.element || 'physical', crit: 5, critdmg: 1.5 };
+  let playerHP = startingHP;
+  let enemyHP = enemy.hp;
+  let damageTaken = 0;
+  let rounds = 0;
+  while (playerHP > 0 && enemyHP > 0 && rounds < 50) {
+    const pDmg = calculateSimDamage({ attack: playerStats.attack, defense: playerStats.defense, crit: playerStats.crit || 5, critdmg: playerStats.critdmg || 1.5, element: playerStats.element || 'physical' }, enemyStats);
+    enemyHP -= pDmg;
+    if (playerStats.lifesteal) playerHP = Math.min(playerStats.maxHP, playerHP + Math.round(pDmg * playerStats.lifesteal));
+    if (enemyHP <= 0) break;
+    const eDmg = calculateSimDamage(enemyStats, { defense: playerStats.defense, element: playerStats.element || 'physical' });
+    damageTaken += eDmg;
+    playerHP -= eDmg;
+    rounds += 1;
+  }
+  const victory = enemyHP <= 0 && playerHP > 0;
+  const xpBoost = 1 + (state.player.modifiers.xpBoost || 0);
+  const goldBoost = 1 + (state.player.modifiers.goldBoost || 0);
+  const xpGain = victory ? Math.max(1, Math.round(enemy.xp * (1 / 3) * 1.25 * 1.15 * 0.6 * xpBoost)) : 0;
+  const goldGain = victory ? Math.round(enemy.gold * 1.18 * 0.9 * goldBoost) : 0;
+  const summary = { loot: [], materials: {}, chests: {}, eggs: 0 };
+  if (victory) {
+    dropLoot(false, { silent: true, summary });
+    progressQuest('combat', 1, zone.id);
+    hatchProgress();
+  }
+  return { victory, remainingHP: Math.max(0, Math.round(playerHP)), damageTaken, xp: xpGain, gold: goldGain, loot: summary.loot, materials: summary.materials, chests: summary.chests, eggs: summary.eggs };
+}
+
+function autoBattle() {
   const cdState = getActionCooldownState('AUTO_BATTLE');
   if (!cdState.ready) { logMessage(`Auto battle ready in ${formatCooldown(cdState.remaining)}.`); return; }
+  if (CombatSystem.active) { logMessage('Finish the current battle before auto battling.'); return; }
+  if (state.currentZone >= state.unlockedZones) { logMessage('Defeat the zone boss to progress before auto battling.'); return; }
+  const zone = zones[state.currentZone];
+  let count = parseInt(document.getElementById('auto-count').value, 10);
+  if (Number.isNaN(count) || count < 1) count = 1;
+  count = Math.min(20, count);
+  const derived = applyBonuses(state.player.baseStats, state.player);
+  if (state.player.currentHP < derived.maxHP * 0.15) logMessage('Warning: low HP could end your auto run early.');
   startActionCooldown('AUTO_BATTLE');
-  const count = Math.max(1, Math.min(10, parseInt(document.getElementById('auto-count').value) || 1));
-  state.autoMode = { remaining: count, boss };
-  startFight(boss, true, { skipFightCooldown: true });
+  const initialHP = state.player.currentHP;
+  let playerHP = state.player.currentHP;
+  const summary = { fights: 0, wins: 0, losses: 0, xp: 0, gold: 0, loot: [], materials: {}, chests: {}, eggs: 0 };
+  for (let i = 0; i < count; i++) {
+    if (playerHP <= 0) { summary.losses += 1; break; }
+    const result = simulateAutoFight(derived, playerHP, zone);
+    summary.fights += 1;
+    playerHP = result.remainingHP;
+    if (result.victory) {
+      summary.wins += 1;
+      summary.xp += result.xp;
+      summary.gold += result.gold;
+      summary.loot.push(...result.loot);
+      Object.entries(result.materials).forEach(([k, v]) => { summary.materials[k] = (summary.materials[k] || 0) + v; });
+      Object.entries(result.chests).forEach(([k, v]) => { summary.chests[k] = (summary.chests[k] || 0) + v; });
+      summary.eggs += result.eggs || 0;
+    } else {
+      summary.losses += 1;
+      break;
+    }
+  }
+  state.player.currentHP = Math.max(0, Math.round(playerHP));
+  if (summary.xp > 0) grantPlayerXP(summary.xp);
+  if (summary.gold > 0) state.player.gold += summary.gold;
+  Object.entries(summary.materials).forEach(([k, v]) => addMaterial(k, v));
+  Object.entries(summary.chests).forEach(([k, v]) => { state.chests[k] = (state.chests[k] || 0) + v; });
+  const fightsCompleted = summary.fights;
+  if (state.foodBuff && state.foodBuff.battles > 0 && fightsCompleted > 0) {
+    state.foodBuff.battles -= fightsCompleted;
+    if (state.foodBuff.battles <= 0) logMessage(`${state.foodBuff.source || 'Food buff'} fades.`);
+  }
+  const hpLost = Math.max(0, initialHP - state.player.currentHP);
+  const lootText = summary.loot.length ? summary.loot.slice(0, 4).join(', ') + (summary.loot.length > 4 ? '…' : '') : 'none';
+  const chestText = Object.entries(summary.chests).map(([k, v]) => `${chestTypes[k]?.name || k} x${v}`).join(', ');
+  const matText = Object.entries(summary.materials).map(([k, v]) => `${materialMap[k]?.name || k} x${v}`).join(', ');
+  const extras = [lootText, chestText, matText].filter(Boolean).join(' | ');
+  const summaryLine = `Auto battle ran ${summary.fights} fight${summary.fights === 1 ? '' : 's'}: ${summary.wins} win${summary.wins === 1 ? '' : 's'}${summary.losses ? `, ${summary.losses} loss` : ''}, +${summary.xp} XP, +${summary.gold} gold, loot: ${extras || 'none'}, HP lost: ${hpLost}.`;
+  const summaryEl = document.getElementById('auto-summary');
+  if (summaryEl) summaryEl.textContent = summaryLine;
+  logMessage(summaryLine);
+  saveGame();
+  updateAll();
 }
 
 function finishCombat(result, bossFlag) {
@@ -2435,40 +2525,47 @@ function grantPlayerXP(amount) {
   levelCheck();
 }
 
-function dropLoot(boss) {
+function dropLoot(boss, opts = {}) {
+  const silent = opts.silent;
+  const summary = opts.summary;
   const derived = applyBonuses(state.player.baseStats, state.player);
   const baseLoot = boss ? 0.9 : 0.55;
   const lootChance = Math.min(0.98, baseLoot * 1.5 + (state.player.modifiers.lootBoost || 0) + (derived.lootBuff || 0));
   if (Math.random() < lootChance) {
     const item = generateItem(state.player.level, boss);
     state.inventory.push(item);
-    logMessage(`Loot found: ${item.name}`);
+    if (summary) summary.loot.push(item.name);
+    if (!silent) logMessage(`Loot found: ${item.name}`);
   }
   if (Math.random() < 0.2) {
     const potion = createPotion(state.player.level);
     state.inventory.push(potion);
-    logMessage('You found a healing brew.');
+    if (summary) summary.loot.push(potion.name || 'Healing Brew');
+    if (!silent) logMessage('You found a healing brew.');
   }
   const zone = zones[state.currentZone];
   if (zone && Math.random() < 0.22) {
     const tier = Math.max(...(zone.allowedMaterialTiers || [1]));
     const gem = createRandomGem(Math.min(5, tier));
     state.inventory.push(gem);
-    logMessage(`A socketable ${gem.name} drops.`);
+    if (summary) summary.loot.push(gem.name);
+    if (!silent) logMessage(`A socketable ${gem.name} drops.`);
   }
   const chestChance = boss ? 0.25 : 0.08;
   if (Math.random() < chestChance) {
     const chestId = boss ? 'gold_chest' : 'wood_chest';
     state.chests[chestId] = (state.chests[chestId] || 0) + 1;
-    logMessage(`You found a ${chestTypes[chestId].name}.`);
+    if (summary) summary.chests[chestId] = (summary.chests[chestId] || 0) + 1;
+    if (!silent) logMessage(`You found a ${chestTypes[chestId].name}.`);
   }
   const eggChance = (boss ? 0.35 : 0.15) * 0.5 * (1 + (state.player.modifiers.eggBoost || 0));
   if (Math.random() < eggChance) {
     const egg = createEgg(boss);
     state.eggs.push(egg);
-    logMessage(`You obtained a ${egg.rarity} dragon egg!`);
+    if (summary) summary.eggs = (summary.eggs || 0) + 1;
+    if (!silent) logMessage(`You obtained a ${egg.rarity} dragon egg!`);
   }
-  grantCombatMaterials(boss);
+  grantCombatMaterials(boss, opts);
 }
 
 function rollDragonBonus(rarity) {
@@ -2521,7 +2618,9 @@ function createPotion(level) {
   return { id: crypto.randomUUID(), type: 'potion', name: choice.name, rarity: choice.rarity, heal: choice.base + level * choice.scale, price: 15 + level * 5 + choice.scale };
 }
 
-function grantCombatMaterials(boss) {
+function grantCombatMaterials(boss, opts = {}) {
+  const silent = opts.silent;
+  const summary = opts.summary;
   ensureLifeSkills();
   const huntingLevel = state.lifeSkills.hunting ? state.lifeSkills.hunting.level : 1;
   const bonusChance = 1 + huntingLevel * 0.03;
@@ -2532,7 +2631,8 @@ function grantCombatMaterials(boss) {
     if (Math.random() < baseChance * bonusChance) {
       const qty = 1 + Math.floor(Math.random() * Math.max(1, Math.floor(huntingLevel / 4)) + 1);
       addMaterial(d.id, qty);
-      logMessage(`You recover ${d.name} x${qty} from the battle.`);
+      if (summary) summary.materials[d.id] = (summary.materials[d.id] || 0) + qty;
+      if (!silent) logMessage(`You recover ${d.name} x${qty} from the battle.`);
     }
   });
 }
@@ -4158,7 +4258,7 @@ function initGame() {
   renderZones();
   document.getElementById('fight-btn').onclick = () => startFight(false);
   document.getElementById('boss-btn').onclick = () => startFight(true);
-  document.getElementById('auto-btn').onclick = () => autoBattle(false);
+  document.getElementById('auto-btn').onclick = () => autoBattle();
   document.getElementById('attack-btn').onclick = () => CombatSystem.playerAction('attack');
   document.getElementById('refresh-shop').onclick = () => { generateShop(); renderShop(); saveGame(); };
   setInterval(() => updateEpicActionTimers(), 1000);
