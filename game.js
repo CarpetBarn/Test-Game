@@ -4236,6 +4236,8 @@ function updatePlayerHeader() {
   const atkEl = document.getElementById('player-atk');
   const defEl = document.getElementById('player-def');
   const critEl = document.getElementById('player-crit');
+  const critDmgEl = document.getElementById('player-crit-dmg');
+  const elemEl = document.getElementById('player-element');
   const speedEl = document.getElementById('player-speed');
   if (nameEl) nameEl.textContent = p.name;
   if (classEl) classEl.textContent = p.class;
@@ -4244,6 +4246,17 @@ function updatePlayerHeader() {
   if (atkEl) atkEl.textContent = s.attack ?? '-';
   if (defEl) defEl.textContent = s.defense ?? '-';
   if (critEl) critEl.textContent = `${s.critChance ?? 0}%`;
+  if (critDmgEl) critDmgEl.textContent = `${s.critDamage ?? 0}%`;
+  if (elemEl) {
+    const elements = [
+      { label: 'Fire', value: s.elementalAttackFire },
+      { label: 'Frost', value: s.elementalAttackFrost },
+      { label: 'Shadow', value: s.elementalAttackShadow },
+    ].filter((e) => e.value && e.value !== 0);
+    elemEl.textContent = elements.length
+      ? elements.map((e) => `${e.label} ${e.value}`).join(' | ')
+      : 'None';
+  }
   if (speedEl) speedEl.textContent = s.speed ?? '-';
 
   const setVal = (id, val, percent) => {
