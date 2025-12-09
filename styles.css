@@ -211,6 +211,10 @@ body.animations-off *::after {
 .panel-subhead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; gap: 8px; }
 .epic-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
 .epic-actions button { width: 100%; justify-content: center; display: inline-flex; align-items: center; gap: 6px; }
+
+.gate-boss-row { display: flex; align-items: center; gap: 10px; margin: 8px 0 4px; }
+.gate-boss-btn { padding: 8px 12px; border-radius: var(--radius-lg); }
+.gate-boss-info { flex: 1; }
 .action-pill { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 999px; background: rgba(255,255,255,0.06); font-size: 0.75rem; }
 .zone-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin-top: 10px; }
 .auto-row { display: flex; flex-direction: column; gap: 4px; color: var(--color-muted); }

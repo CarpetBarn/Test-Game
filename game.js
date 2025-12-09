@@ -4,8 +4,32 @@
 const ENEMY_SCALE = 2;
 const ENEMY_ATTACK_MOD = 5 / 6; // global reduction to enemy attack power
 const MAX_LEVEL = 200;
-const MAX_COMBAT_LOG_ENTRIES = 6;
+const MAX_COMBAT_LOG_ENTRIES = 20;
 const EGG_DROP_BONUS = 0.06;
+const SAVE_DEBOUNCE_MS = 6000;
+
+function xpForLevel(level) {
+  const base = 50;
+  const growth = 1.85;
+  return Math.floor(base * Math.pow(Math.max(1, level), growth));
+}
+
+function xpToNextLevel(currentLevel) {
+  return xpForLevel(currentLevel + 1);
+}
+
+const EventBus = {
+  listeners: {},
+  on(event, cb) {
+    if (!this.listeners[event]) this.listeners[event] = [];
+    this.listeners[event].push(cb);
+  },
+  emit(event, payload) {
+    (this.listeners[event] || []).forEach(cb => {
+      try { cb(payload); } catch (e) { console.error(e); }
+    });
+  },
+};
 
 const zoneRarityWeights = {
   1: { common: 0.7, uncommon: 0.25, rare: 0.05, epic: 0, legendary: 0 },
@@ -1457,6 +1481,8 @@ const state = {
   shopRefresh: 0,
 };
 
+const gameState = state;
+
 function createPlayer(cls) {
   const base = classData[cls];
   return {
@@ -1465,7 +1491,7 @@ function createPlayer(cls) {
     baseStats: { ...base },
     level: 1,
     xp: 0,
-    xpToNext: 30,
+    xpToNext: xpToNextLevel(1),
     gold: 50,
     equipment: { weapon: null, armor: null, helmet: null, boots: null, accessory: null },
     skillPoints: 0,
@@ -1672,7 +1698,10 @@ function weightedRarity(input = {}) {
   const weights = {};
   rarities.forEach(r => {
     let weight = zoneWeights ? zoneWeights[r.key] || 0 : r.weight;
-    if (playerLevel < 20 && (r.key === 'common' || r.key === 'uncommon')) weight *= 1.12;
+    if (playerLevel < 20) {
+      if (r.key === 'common') weight *= 1.15;
+      if (r.key === 'uncommon') weight *= 1.1;
+    }
     if (isBoss) weight *= 1.25;
     weights[r.key] = weight;
   });
@@ -1972,7 +2001,7 @@ const CombatSystem = {
   usesRageResource() {
     return usesRage(this.battle?.player);
   },
-  startBattle({ player, enemy, isBoss, zone, zoneMod, auto }) {
+  startBattle({ player, enemy, isBoss, zone, zoneMod, auto, options }) {
     ensureModifierDefaults(player);
     this.active = true;
     this.battle = {
@@ -1982,6 +2011,7 @@ const CombatSystem = {
       zone,
       zoneMod,
       auto,
+      options,
       turn: 'player',
       playerStatuses: [],
       enemyStatuses: [],
@@ -2347,7 +2377,7 @@ const CombatSystem = {
   },
   finish(victory) {
     this.active = false;
-    finishCombat({ victory, boss: this.battle.isBoss });
+    finishCombat({ victory, boss: this.battle.isBoss, zone: this.battle.zone, options: this.battle.options });
     this.battle = null;
     this.updateActionButtons();
     this.updateStatusUI();
@@ -2361,7 +2391,7 @@ function startFight(boss = false, auto = false, opts = {}) {
     if (!fightCd.ready) { logMessage(`Fight is on cooldown (${formatCooldown(fightCd.remaining)}).`); return; }
     startActionCooldown('FIGHT');
   }
-  const zone = zones[state.currentZone];
+  const zone = opts.zoneOverride || zones[state.currentZone];
   const bossLevelLock = zone.level + 2;
   let bossFight = boss || opts.mode === 'boss' || opts.treatAsBoss;
   if (bossFight && state.player.level < bossLevelLock) {
@@ -2387,6 +2417,8 @@ function startFight(boss = false, auto = false, opts = {}) {
   state.currentEnemy.gold = Math.round(state.currentEnemy.gold * (1 + (diff - 1) * 0.9));
   state.currentEnemy.xp = Math.round(state.currentEnemy.xp * (1 + (diff - 1)));
   state.currentEnemy.noUnlock = !!opts.noUnlock;
+  state.currentEnemy.unlocksZoneId = opts.unlocksZoneId || null;
+  state.currentEnemy.isGateBoss = !!opts.isGateBoss;
   document.getElementById('enemy-display').textContent = `${state.currentEnemy.name} (Lv ${zone.level}${bossFight ? ' Boss' : ''})`;
   const zoneMod = zoneModifiers[zone.name] || null;
   document.getElementById('battle-info').textContent = zoneMod ? zoneMod.desc : '';
@@ -2397,6 +2429,7 @@ function startFight(boss = false, auto = false, opts = {}) {
     zone,
     zoneMod,
     auto,
+    options: opts,
   });
 }
 
@@ -2504,7 +2537,9 @@ function finishCombat(result, bossFlag) {
   const victory = payload.victory;
   const boss = payload.boss;
   const player = state.player;
-  const zone = zones[state.currentZone];
+  const zone = payload.zone || zones[state.currentZone];
+  const gateUnlock = payload.options?.unlocksZoneId;
+  const isGateBoss = payload.options?.isGateBoss;
   if (victory) {
     const xpBoost = 1 + (player.modifiers.xpBoost || 0);
     const xpGain = Math.max(1, Math.round(state.currentEnemy.xp * (1 / 3) * 1.25 * 1.15 * xpBoost));
@@ -2527,7 +2562,7 @@ function finishCombat(result, bossFlag) {
     hatchProgress();
     randomEvent();
     if (boss && !state.currentEnemy?.noUnlock) {
-      onBossDefeated(state.currentEnemy?.id || state.currentEnemy?.name);
+      onBossDefeated(state.currentEnemy?.id || state.currentEnemy?.name, { unlocksZoneId: gateUnlock, isGateBoss });
     }
   } else {
     logMessage('You died... returning to town.');
@@ -2560,14 +2595,20 @@ function finishCombat(result, bossFlag) {
   }
 }
 
-function onBossDefeated(bossId) {
+function onBossDefeated(bossId, opts = {}) {
   if (!bossId) return;
   if (!state.defeatedBossIds.includes(bossId)) {
     state.defeatedBossIds.push(bossId);
   }
-  saveGame();
+  if (opts.unlocksZoneId) {
+    const unlockedZone = zones[opts.unlocksZoneId - 1];
+    if (unlockedZone) logMessage(`${unlockedZone.name} is now unlocked!`);
+  }
+  EventBus.emit('BOSS_DEFEATED', { bossId, unlocks: opts.unlocksZoneId });
   renderZones();
   renderMapPanel();
+  updateGateBossUI();
+  scheduleSave();
 }
 
 function levelCheck() {
@@ -2580,13 +2621,15 @@ function levelCheck() {
     player.baseStats.attack += 2;
     player.baseStats.defense += 1;
     player.baseStats.crit += 0.5;
-    player.xpToNext = Math.floor(player.xpToNext * 1.2);
+    player.xpToNext = xpToNextLevel(player.level);
     player.skillPoints++;
     const derived = applyBonuses(player.baseStats, player);
     player.currentHP = derived.maxHP;
     updateHealthBar(player, playerHpBar, playerHpText, derived.maxHP);
     logMessage(`Level up! You reached level ${player.level}.`);
+    EventBus.emit('PLAYER_LEVEL_CHANGED', player.level);
   }
+  updateGateBossUI();
 }
 
 function grantPlayerXP(amount) {
@@ -3387,6 +3430,7 @@ function handleZoneCardClick(targetZone) {
   state.currentZone = targetZone;
   startActionCooldown('TRAVEL_ZONE');
   logMessage(`Traveling to ${zone.name}. Next move available in 20 minutes.`);
+  EventBus.emit('ZONE_CHANGED', state.currentZone);
   updateAll();
 }
 
@@ -3408,6 +3452,61 @@ function updateEpicActionsSummary() {
   const busy = epicActions.filter(a => !getActionCooldownState(a.cooldownId || a.id).ready).length;
   document.querySelectorAll('.epic-actions-summary').forEach(el => {
     el.textContent = busy ? `${busy} actions on cooldown` : 'All actions ready';
+  });
+}
+
+function getNextLockedZone() {
+  const sorted = [...zones].sort((a, b) => a.id - b.id);
+  for (const zone of sorted) {
+    if (zone.id === 1) continue;
+    if (!isZoneUnlocked(zone.id - 1, state.player)) return zone;
+  }
+  return null;
+}
+
+function getGateBossForZone(zone) {
+  if (!zone || !zone.gateBossId) return null;
+  return bossById(zone.gateBossId) || zone.boss;
+}
+
+function updateGateBossUI() {
+  const btn = document.getElementById('gate-boss-button');
+  const info = document.getElementById('gate-boss-info');
+  if (!btn || !info) return;
+  const nextZone = getNextLockedZone();
+  if (!nextZone) {
+    btn.disabled = true;
+    btn.textContent = 'All zones unlocked';
+    info.textContent = '';
+    return;
+  }
+  const boss = getGateBossForZone(nextZone);
+  const meetsLevel = state.player?.level >= (nextZone.requiredLevel || nextZone.level || 1);
+  if (!boss) {
+    btn.disabled = true;
+    btn.textContent = 'Gate boss unavailable';
+    info.textContent = '';
+    return;
+  }
+  btn.disabled = !meetsLevel;
+  btn.textContent = meetsLevel ? `Challenge ${boss.name}` : `Requires Lv ${nextZone.requiredLevel}`;
+  info.textContent = `Unlocks ${nextZone.name}`;
+}
+
+function initGateBossButton() {
+  const btn = document.getElementById('gate-boss-button');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    const nextZone = getNextLockedZone();
+    if (!nextZone) return;
+    const boss = getGateBossForZone(nextZone);
+    if (!boss) return;
+    if (state.player.level < (nextZone.requiredLevel || nextZone.level || 1)) {
+      logMessage(`You must be level ${nextZone.requiredLevel || nextZone.level} to challenge this gate boss.`);
+      return;
+    }
+    const opts = { isGateBoss: true, unlocksZoneId: nextZone.id, zoneOverride: nextZone };
+    startFight(true, false, opts);
   });
 }
 
@@ -4368,6 +4467,7 @@ function refreshPlayerStats() {
     element: derived.element || 'physical',
   };
   p.stats = stats;
+  EventBus.emit('PLAYER_STATS_CHANGED', { ...stats });
   return { derived, stats };
 }
 
@@ -4470,10 +4570,11 @@ function updateAll() {
   renderLifeSkillsTab();
   renderShop();
   renderEpicSystems();
+  updateGateBossUI();
   updateBars();
   CombatSystem.updateActionButtons();
   updateFightButtons();
-  saveGame();
+  scheduleSave();
 }
 
 function prestige() {
@@ -4526,6 +4627,15 @@ function resetGame() {
   setupClassSelection();
 }
 
+let saveTimer = null;
+function scheduleSave() {
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    saveGame();
+  }, SAVE_DEBOUNCE_MS);
+}
+
 function saveGame() {
   const data = {
     player: state.player,
@@ -4561,6 +4671,7 @@ function loadGame() {
     const parsed = JSON.parse(data);
     state.player = parsed.player;
     ensureModifierDefaults(state.player);
+    state.player.xpToNext = xpToNextLevel(state.player.level || 1);
     Object.values(state.player.equipment || {}).forEach(it => { if (it) { ensureItemMeta(it); } });
     state.inventory = parsed.inventory || [];
     state.inventory.forEach(it => { if (!it.type) it.type = 'gear'; ensureItemMeta(it); });
@@ -4591,6 +4702,7 @@ function loadGame() {
     ensureLifeSkills();
     const unlockedFallback = zones.reduce((idx, _, i) => (isZoneUnlocked(i) ? i : idx), 0);
     if (!isZoneUnlocked(state.currentZone)) state.currentZone = unlockedFallback;
+    levelCheck();
     return true;
   }
   return false;
@@ -4616,6 +4728,7 @@ function initGame() {
   ensureLifeSkills();
   initSidebarNavigation();
   initPlayerStatsToggle();
+  initGateBossButton();
   renderZones();
   renderEpicActionsMounts();
   document.getElementById('fight-btn').onclick = () => startFight(false);
@@ -4624,6 +4737,9 @@ function initGame() {
   document.getElementById('attack-btn').onclick = () => CombatSystem.playerAction('attack');
   document.getElementById('refresh-shop').onclick = () => { generateShop(); renderShop(); saveGame(); };
   setInterval(() => updateEpicActionTimers(), 1000);
+  EventBus.on('PLAYER_LEVEL_CHANGED', updateGateBossUI);
+  EventBus.on('BOSS_DEFEATED', updateGateBossUI);
+  EventBus.on('ZONE_CHANGED', updateGateBossUI);
   ['slot','rarity','type'].forEach(key => {
     document.getElementById(`filter-${key}`).addEventListener('change', (e) => {
       state.filters[key] = e.target.value;
