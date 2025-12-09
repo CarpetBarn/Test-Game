@@ -28,6 +28,130 @@ function getElementMultiplier(attacker = 'physical', defender = 'physical') {
   return source[defender] || 1;
 }
 
+const rarityOrder = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
+
+const DEFAULT_SETTINGS = {
+  uiScale: 'medium',
+  animations: true,
+  lootFilterMode: 'normal',
+  colorblindMode: false,
+};
+
+let settings = { ...DEFAULT_SETTINGS };
+
+function loadSettings() {
+  const raw = localStorage.getItem('gameSettings');
+  if (!raw) return;
+  try {
+    const parsed = JSON.parse(raw);
+    settings = { ...settings, ...parsed };
+  } catch (e) {
+    console.error('Failed to parse settings', e);
+  }
+}
+
+function saveSettings() {
+  localStorage.setItem('gameSettings', JSON.stringify(settings));
+}
+
+function updateSettingsCardLabels() {
+  const map = {
+    'ui-scale': settings.uiScale === 'small' ? 'Small' : settings.uiScale === 'large' ? 'Large' : 'Medium',
+    animations: settings.animations ? 'On' : 'Off',
+    'loot-filters':
+      settings.lootFilterMode === 'normal'
+        ? 'All loot'
+        : settings.lootFilterMode === 'hideCommons'
+        ? 'Hide Commons'
+        : 'Rare+ only',
+    'colorblind-mode': settings.colorblindMode ? 'Enabled' : 'Disabled',
+  };
+  document.querySelectorAll('[data-setting-value]').forEach(el => {
+    const key = el.dataset.settingValue;
+    if (map[key] != null) el.textContent = map[key];
+  });
+}
+
+function updateLootFilterBehavior() {
+  const mode = settings.lootFilterMode || 'normal';
+  const defaultMin = mode === 'hideCommons' ? 'uncommon' : mode === 'rarePlus' ? 'rare' : 'common';
+  state.filters.minRarity = defaultMin;
+  const raritySelect = document.getElementById('filter-rarity');
+  if (raritySelect) {
+    raritySelect.value = mode === 'normal' ? 'all' : defaultMin;
+  }
+  if (state.player) renderInventory();
+}
+
+function setLootFilter(opts = {}) {
+  if (opts.minRarity) {
+    state.filters.minRarity = opts.minRarity;
+    const raritySelect = document.getElementById('filter-rarity');
+    if (raritySelect && raritySelect.value === 'all') {
+      raritySelect.value = opts.minRarity;
+    }
+  }
+  if (state.player) renderInventory();
+}
+
+function applySettings() {
+  const root = document.documentElement;
+  const body = document.body;
+  if (settings.uiScale === 'small') {
+    root.style.setProperty('--ui-scale', '0.9');
+  } else if (settings.uiScale === 'large') {
+    root.style.setProperty('--ui-scale', '1.1');
+  } else {
+    root.style.setProperty('--ui-scale', '1');
+  }
+
+  if (settings.animations) {
+    body.classList.remove('animations-off');
+  } else {
+    body.classList.add('animations-off');
+  }
+
+  if (settings.colorblindMode) {
+    body.classList.add('colorblind-mode');
+  } else {
+    body.classList.remove('colorblind-mode');
+  }
+
+  updateLootFilterBehavior();
+  updateSettingsCardLabels();
+}
+
+function onSettingCardClick(settingId) {
+  switch (settingId) {
+    case 'ui-scale':
+      settings.uiScale = settings.uiScale === 'small' ? 'medium' : settings.uiScale === 'medium' ? 'large' : 'small';
+      break;
+    case 'animations':
+      settings.animations = !settings.animations;
+      break;
+    case 'loot-filters':
+      if (settings.lootFilterMode === 'normal') settings.lootFilterMode = 'hideCommons';
+      else if (settings.lootFilterMode === 'hideCommons') settings.lootFilterMode = 'rarePlus';
+      else settings.lootFilterMode = 'normal';
+      break;
+    case 'colorblind-mode':
+      settings.colorblindMode = !settings.colorblindMode;
+      break;
+    default:
+      break;
+  }
+  saveSettings();
+  applySettings();
+}
+
+function initSettingsCards() {
+  document.querySelectorAll('.setting-card').forEach(card => {
+    const settingId = card.dataset.setting;
+    if (!settingId) return;
+    card.addEventListener('click', () => onSettingCardClick(settingId));
+  });
+}
+
 const statPool = [
   { key: 'hp', label: 'Max HP', base: 10 },
   { key: 'attack', label: 'Attack', base: 2 },
@@ -1280,7 +1404,7 @@ const state = {
   currentEnemy: null,
   log: [],
   shop: [],
-  filters: { slot: 'all', rarity: 'all', type: 'all' },
+  filters: { slot: 'all', rarity: 'all', type: 'all', minRarity: 'common' },
   prestige: 0,
   lifeSkills: {},
   materials: {},
@@ -3430,6 +3554,9 @@ function valueFromItem(item) {
 function filteredInventoryItems() {
   return state.inventory.filter(item => {
     const type = item.type || 'gear';
+    const rarityIndex = rarityOrder.indexOf(item.rarity || 'common');
+    const minIdx = rarityOrder.indexOf(state.filters.minRarity || 'common');
+    if (rarityIndex !== -1 && minIdx !== -1 && rarityIndex < minIdx) return false;
     if (state.filters.type !== 'all' && type !== state.filters.type) return false;
     if (state.filters.slot !== 'all' && item.slot !== state.filters.slot) return false;
     if (state.filters.rarity !== 'all' && item.rarity !== state.filters.rarity) return false;
@@ -4050,6 +4177,9 @@ function initGame() {
 }
 
 window.onload = () => {
+  loadSettings();
+  applySettings();
+  initSettingsCards();
   if (!loadGame()) {
     setupClassSelection();
   } else {
