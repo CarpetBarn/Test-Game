@@ -3,6 +3,19 @@
 
 const ENEMY_SCALE = 2;
 const ENEMY_ATTACK_MOD = 5 / 6; // global reduction to enemy attack power
+const MAX_LEVEL = 200;
+const MAX_COMBAT_LOG_ENTRIES = 6;
+const EGG_DROP_BONUS = 0.06;
+
+const zoneRarityWeights = {
+  1: { common: 0.7, uncommon: 0.25, rare: 0.05, epic: 0, legendary: 0 },
+  2: { common: 0.6, uncommon: 0.3, rare: 0.09, epic: 0.01, legendary: 0 },
+  3: { common: 0.5, uncommon: 0.3, rare: 0.15, epic: 0.04, legendary: 0.01 },
+  4: { common: 0.4, uncommon: 0.3, rare: 0.2, epic: 0.08, legendary: 0.02 },
+  5: { common: 0.3, uncommon: 0.3, rare: 0.25, epic: 0.1, legendary: 0.05 },
+  6: { common: 0.2, uncommon: 0.25, rare: 0.3, epic: 0.15, legendary: 0.1 },
+  7: { common: 0.1, uncommon: 0.2, rare: 0.35, epic: 0.2, legendary: 0.15 },
+};
 
 const rarities = [
   { key: 'common', label: 'Common', color: 'common', weight: 70, stats: [1, 2], scale: 1 },
@@ -1650,12 +1663,23 @@ function spendRage(amount) {
   return true;
 }
 
-function weightedRarity(isBoss) {
-  const totalWeight = rarities.reduce((t, r) => t + (isBoss ? r.weight * 1.25 : r.weight), 0);
+function weightedRarity(input = {}) {
+  const opts = typeof input === 'boolean' ? { isBoss: input } : input || {};
+  const isBoss = !!opts.isBoss;
+  const zoneId = opts.zoneId ?? state.currentZone;
+  const playerLevel = opts.playerLevel ?? (state.player?.level || 1);
+  const zoneWeights = zoneRarityWeights[zoneId] || null;
+  const weights = {};
+  rarities.forEach(r => {
+    let weight = zoneWeights ? zoneWeights[r.key] || 0 : r.weight;
+    if (playerLevel < 20 && (r.key === 'common' || r.key === 'uncommon')) weight *= 1.12;
+    if (isBoss) weight *= 1.25;
+    weights[r.key] = weight;
+  });
+  const totalWeight = Object.values(weights).reduce((t, w) => t + w, 0) || 1;
   let roll = Math.random() * totalWeight;
   for (const r of rarities) {
-    const weight = isBoss ? r.weight * 1.25 : r.weight;
-    roll -= weight;
+    roll -= weights[r.key];
     if (roll <= 0) return r;
   }
   return rarities[0];
@@ -1798,9 +1822,10 @@ function performEpicAction(actionId) {
 
 function logMessage(msg, css) {
   state.log.unshift({ msg, css });
+  if (state.log.length > MAX_COMBAT_LOG_ENTRIES) state.log = state.log.slice(0, MAX_COMBAT_LOG_ENTRIES);
   const logBox = document.getElementById('combat-log');
   logBox.innerHTML = state.log
-    .slice(0, 12)
+    .slice(0, MAX_COMBAT_LOG_ENTRIES)
     .map(line => `<div class="${line.css || ''}">${line.msg}</div>`)
     .join('');
 }
@@ -2548,6 +2573,7 @@ function onBossDefeated(bossId) {
 function levelCheck() {
   const player = state.player;
   while (player.xp >= player.xpToNext) {
+    if (player.level >= MAX_LEVEL) { player.xp = player.xpToNext; break; }
     player.xp -= player.xpToNext;
     player.level++;
     player.baseStats.hp += 8;
@@ -2602,7 +2628,10 @@ function dropLoot(boss, opts = {}) {
     if (summary) summary.chests[chestId] = (summary.chests[chestId] || 0) + 1;
     if (!silent) logMessage(`You found a ${chestTypes[chestId].name}.`);
   }
-  const eggChance = (boss ? 0.35 : 0.15) * 0.5 * (1 + (state.player.modifiers.eggBoost || 0));
+  const eggChance = Math.min(
+    0.95,
+    (boss ? 0.35 : 0.15) * 0.5 * (1 + (state.player.modifiers.eggBoost || 0)) + EGG_DROP_BONUS
+  );
   if (Math.random() < eggChance) {
     const egg = createEgg(boss);
     state.eggs.push(egg);
@@ -3416,9 +3445,7 @@ function renderEpicLoopActions(container) {
 
 function renderEpicActionsMounts() {
   const combatMount = document.getElementById('combat-epic-actions-mount');
-  const zoneMount = document.getElementById('zones-epic-actions-mount');
   if (combatMount) renderEpicLoopActions(combatMount);
-  if (zoneMount) renderEpicLoopActions(zoneMount);
 }
 
 function updateEpicActionTimers() {
@@ -3856,7 +3883,12 @@ function usePotion(item) {
     logMessage(`${item.name} grants a temporary boon for ${item.buff.duration} battles.`);
   }
   state.inventory = state.inventory.filter(i => i.id !== item.id);
+  const shouldConsumeTurn = CombatSystem?.active && CombatSystem.turn === 'player';
   updateAll();
+  if (shouldConsumeTurn) {
+    logMessage('Using the potion costs your turn.', 'status');
+    CombatSystem.endPlayerTurn();
+  }
 }
 
 function useFood(item) {
