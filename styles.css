@@ -219,6 +219,9 @@ body.animations-off *::after {
 .zone-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin-top: 10px; }
 .auto-row { display: flex; flex-direction: column; gap: 4px; color: var(--color-muted); }
 .auto-summary { min-height: 18px; }
+.auto-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+
+.life-skill.on-cooldown { display: none; }
 
 .event { margin-top: 10px; padding: 10px; border-radius: var(--radius-md); min-height: 80px; color: var(--color-text); }
 
@@ -241,10 +244,16 @@ body.animations-off *::after {
 .log .boss { color: #f472b6; }
 
 .action-bar { display: grid; grid-template-columns: 1fr; gap: 8px; }
-.skill-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 6px; }
-.skill-btn { position: relative; }
-.skill-btn.disabled { opacity: 0.45; cursor: not-allowed; }
-.skill-btn .cooldown { position: absolute; top: 2px; right: 4px; font-size: 10px; }
+.skill-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.skill-bar { display: flex; gap: 8px; align-items: stretch; width: 100%; }
+.skill-slot { position: relative; flex: 1 0 110px; min-width: 110px; padding: 8px; background: var(--color-panel-strong); border: 1px solid var(--color-border); border-radius: var(--radius-md); display: grid; grid-template-rows: auto auto; gap: 2px; justify-items: start; overflow: hidden; }
+.skill-slot.disabled { opacity: 0.45; cursor: not-allowed; }
+.skill-slot.no-resource { box-shadow: 0 0 0 1px rgba(244, 114, 182, 0.4); }
+.skill-slot .skill-icon { width: 28px; height: 28px; border-radius: 8px; background: linear-gradient(135deg, rgba(79,140,255,0.4), rgba(148,163,184,0.2)); display: grid; place-items: center; font-weight: 700; color: var(--color-text); }
+.skill-slot .skill-label { font-size: 12px; color: var(--color-text); }
+.skill-slot .skill-meta { font-size: 11px; color: var(--color-muted); }
+.skill-slot .cooldown { position: absolute; top: 2px; right: 4px; font-size: 10px; }
+.cooldown-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.45); pointer-events: none; height: 0%; transition: height 0.2s linear; }
 
 .tabs { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 6px; margin-bottom: 10px; }
 .tabs button {

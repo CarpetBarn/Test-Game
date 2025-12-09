@@ -150,6 +150,24 @@
               <div id="skill-actions" class="skill-actions"></div>
             </div>
           </section>
+          <div id="auto-battle-container" class="panel card soft">
+            <div class="panel-header">
+              <div>
+                <h4>Auto Battles</h4>
+                <p class="muted">Fast sims with reduced XP (15s cooldown).</p>
+              </div>
+            </div>
+            <div class="auto-row">
+              <label for="auto-count" class="small">Auto battles</label>
+              <input id="auto-count" type="number" min="1" max="10" value="3">
+            </div>
+            <div class="auto-actions">
+              <button id="fight-btn" class="primary">Fight!</button>
+              <button id="boss-btn" class="warning">Fight Boss</button>
+              <button id="auto-btn" class="ghost">Auto Battle</button>
+            </div>
+            <div id="auto-summary" class="tiny muted auto-summary"></div>
+          </div>
           <div class="gate-boss-row">
             <button id="gate-boss-button" class="gate-boss-btn ghost">Challenge Gate Boss</button>
             <span id="gate-boss-info" class="gate-boss-info tiny muted"></span>
@@ -160,13 +178,13 @@
         <section id="zones-panel" class="main-panel">
           <div class="view-header">
             <div class="section-title">Zones</div>
-            <div class="section-sub">Choose a realm, launch battles, and run auto fights.</div>
+            <div class="section-sub">Choose a realm, review unlocks, and travel.</div>
           </div>
           <section id="zones-card" class="panel card">
             <div class="panel-header">
               <div>
                 <h3>Zones</h3>
-                <p class="muted">Pick a realm and trigger actions.</p>
+                <p class="muted">Pick a realm and review rewards.</p>
               </div>
               <div class="zone-travel-status">
                 <div id="current-zone-label" class="pill pill-soft">Current: Verdantwild</div>
@@ -174,16 +192,6 @@
               </div>
             </div>
             <div id="zone-list" class="zone-card-list"></div>
-            <div class="zone-controls">
-              <div class="auto-row">
-                <label for="auto-count" class="small">Auto battles</label>
-                <input id="auto-count" type="number" min="1" max="10" value="3">
-              </div>
-              <button id="fight-btn" class="primary">Fight!</button>
-              <button id="boss-btn" class="warning">Fight Boss</button>
-              <button id="auto-btn" class="ghost">Auto Battle</button>
-              <div id="auto-summary" class="tiny muted auto-summary"></div>
-            </div>
             <div id="event-area" class="event card-soft"></div>
           </section>
         </section>

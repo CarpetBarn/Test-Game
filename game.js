@@ -4,7 +4,7 @@
 const ENEMY_SCALE = 2;
 const ENEMY_ATTACK_MOD = 5 / 6; // global reduction to enemy attack power
 const MAX_LEVEL = 200;
-const MAX_COMBAT_LOG_ENTRIES = 20;
+const MAX_COMBAT_LOG_ENTRIES = 10;
 const EGG_DROP_BONUS = 0.06;
 const SAVE_DEBOUNCE_MS = 6000;
 
@@ -916,13 +916,22 @@ const classData = {
 };
 
 const classResources = {
-  Warrior: 'Rage',
-  Mage: 'Mana',
-  Rogue: 'Energy',
-  Cleric: 'Mana',
-  Ranger: 'Energy',
-  Paladin: 'Faith',
-  Warlock: 'Mana',
+  Warrior: 'rage',
+  Mage: 'mana',
+  Rogue: 'energy',
+  Cleric: 'devotion',
+  Ranger: 'focus',
+  Paladin: 'devotion',
+  Warlock: 'mana',
+};
+
+const resourceRules = {
+  rage: { max: 100, start: 0, gainOnHit: 10, gainOnAttack: 6 },
+  energy: { max: 100, start: 80, regen: 15 },
+  mana: { max: 120, start: 100, regen: 10 },
+  focus: { max: 100, start: 0, regen: 5, gainOnAttack: 12 },
+  devotion: { max: 110, start: 30, regen: 6, gainOnHeal: 12 },
+  chi: { max: 100, start: 50, regen: 8 },
 };
 
 const zoneModifiers = {
@@ -1485,7 +1494,7 @@ const gameState = state;
 
 function createPlayer(cls) {
   const base = classData[cls];
-  return {
+  const player = {
     name: 'Adventurer',
     class: cls,
     baseStats: { ...base },
@@ -1502,11 +1511,10 @@ function createPlayer(cls) {
     },
     flat: { speed: 0, elemental: 0, hp: 0, attack: 0 },
     currentHP: base.hp,
-    rage: 0,
-    maxRage: 100,
-    maxResource: base.mana,
-    currentResource: base.mana,
+    resources: {},
   };
+  ensureResources(player);
+  return player;
 }
 
 function ensureModifierDefaults(player) {
@@ -1514,10 +1522,14 @@ function ensureModifierDefaults(player) {
     regen: 0, thorns: 0, potionBoost: 0, goldBoost: 0, barrier: 0, eggBoost: 0, dragonBond: 0, spellAmp: 0, fury: 0, bleed: 0, shred: 0 };
   player.modifiers = { ...defaults, accuracy: 0, fire: 0, frost: 0, shadow: 0, fireRes: 0, frostRes: 0, shadowRes: 0, cooldownReduction: 0, bossDamage: 0, dungeonDamage: 0, autoBattle: 0, ...(player.modifiers || {}) };
   player.flat = { speed: 0, elemental: 0, hp: 0, attack: 0, ...(player.flat || {}) };
-  player.maxResource = player.maxResource || player.baseStats.mana || 30;
-  player.currentResource = player.currentResource || player.maxResource;
-  player.maxRage = player.maxRage || 100;
-  player.rage = Math.min(player.maxRage, Math.max(0, player.rage || 0));
+  ensureResources(player);
+  const asc = state.ascension?.bonuses || {};
+  if (asc.attackPct) player.modifiers.attack += asc.attackPct;
+  if (asc.hpPct) player.modifiers.hp += asc.hpPct;
+  if (asc.critPct) player.modifiers.crit += asc.critPct;
+  if (asc.drop) player.modifiers.lootBoost += asc.drop;
+  if (asc.egg) player.modifiers.eggBoost += asc.egg;
+  if (asc.regen) player.modifiers.regen += asc.regen / 100;
 }
 
 function defaultLifeSkills() {
@@ -1654,8 +1666,37 @@ const playerRageBar = document.getElementById('player-rage-bar');
 const playerRageText = document.getElementById('player-rage-text');
 const rageContainer = document.getElementById('rage-container');
 
+function resourceKeyForPlayer(player = state.player) {
+  return classResources[player?.class] || 'mana';
+}
+
+function ensureResources(player = state.player) {
+  if (!player) return;
+  if (!player.resources) player.resources = {};
+  const key = resourceKeyForPlayer(player);
+  const rule = resourceRules[key] || { max: 100, start: 0 };
+  if (!player.resources[key]) player.resources[key] = { current: rule.start ?? rule.max, max: rule.max };
+  const res = player.resources[key];
+  res.max = rule.max;
+  if (res.current == null) res.current = rule.start ?? rule.max;
+  player.maxResource = res.max;
+  player.currentResource = res.current;
+  player.maxRage = rule.max;
+  if (key === 'rage') player.rage = res.current;
+}
+
+function getResourceState(player = state.player) {
+  ensureResources(player);
+  const key = resourceKeyForPlayer(player);
+  return { key, state: player.resources[key] };
+}
+
 function usesRage(player = state.player) {
-  return player && classResources[player.class] === 'Rage';
+  return resourceKeyForPlayer(player) === 'rage';
+}
+
+function formatResourceName(key) {
+  return (key || '').charAt(0).toUpperCase() + (key || '').slice(1);
 }
 
 function updateHealthBar(entity, barElement, textElement, maxOverride) {
@@ -1676,16 +1717,35 @@ function updateRageBar(player) {
 }
 
 function addRage(amount) {
-  if (!usesRage()) return;
-  state.player.rage = Math.max(0, Math.min(state.player.maxRage, state.player.rage + amount));
-  updateRageBar(state.player);
+  addResourceAmount(state.player, 'rage', amount);
 }
 
 function spendRage(amount) {
-  if (!usesRage()) return true;
-  if (state.player.rage < amount) return false;
-  state.player.rage = Math.max(0, state.player.rage - amount);
-  updateRageBar(state.player);
+  return spendResourceAmount(state.player, 'rage', amount);
+}
+
+function addResourceAmount(player, key, amount) {
+  if (!player || !key) return;
+  ensureResources(player);
+  const res = player.resources[key];
+  const rule = resourceRules[key] || {};
+  res.current = Math.max(0, Math.min(res.max, res.current + amount));
+  if (key === 'rage') player.rage = res.current;
+  player.currentResource = res.current;
+  player.maxResource = res.max;
+  if (key === 'rage') updateRageBar(player);
+}
+
+function spendResourceAmount(player, key, amount) {
+  if (!player || !key) return true;
+  ensureResources(player);
+  const res = player.resources[key];
+  if (res.current < amount) return false;
+  res.current = Math.max(0, res.current - amount);
+  if (key === 'rage') player.rage = res.current;
+  player.currentResource = res.current;
+  player.maxResource = res.max;
+  if (key === 'rage') updateRageBar(player);
   return true;
 }
 
@@ -2018,9 +2078,14 @@ const CombatSystem = {
       skillCooldowns: {},
     };
     this.turn = 'player';
-    const rageMode = this.usesRageResource();
-    player.currentResource = rageMode ? 0 : player.maxResource;
-    player.rage = rageMode ? 0 : player.rage;
+    ensureResources(player);
+    const { key, state: resState } = getResourceState(player);
+    const rule = resourceRules[key] || {};
+    resState.max = rule.max || resState.max;
+    resState.current = rule.start ?? (key === 'rage' ? 0 : resState.max);
+    player.currentResource = resState.current;
+    player.maxResource = resState.max;
+    if (key === 'rage') player.rage = resState.current;
     logMessage(`Battle start against ${enemy.name}${isBoss ? ' (Boss)' : ''}.`);
     const playerSpeed = this.computePlayerStats().speed || 10;
     const enemySpeed = this.computeEnemyStats().speed || 10;
@@ -2071,11 +2136,9 @@ const CombatSystem = {
       logMessage(`${target === 'player' ? 'The zone harms you' : 'The zone harms the foe'} for ${this.battle.zoneMod.dot}.`, 'status');
     }
     if (target === 'player') {
-      if (this.usesRageResource()) {
-        addRage(5);
-      } else {
-        entity.currentResource = Math.min(entity.maxResource, entity.currentResource + 3);
-      }
+      const { key, state: resState } = getResourceState(entity);
+      const rule = resourceRules[key] || {};
+      if (rule.regen) addResourceAmount(entity, key, rule.regen);
     }
     statuses.forEach(s => {
       if (s.type === 'dot' && s.tick) {
@@ -2108,17 +2171,17 @@ const CombatSystem = {
   handlePlayerAction(type, skillId) {
     const playerStats = this.computePlayerStats();
     const enemyStats = this.computeEnemyStats();
+    const { key: resKey } = getResourceState(this.battle.player);
     if (type === 'skill') {
       const skill = activeSkills[this.battle.player.class].find(s => s.id === skillId);
       if (!this.canUseSkill(skill)) return false;
-      if (this.usesRageResource()) {
-        if (!spendRage(skill.cost)) return false;
-      } else {
-        this.battle.player.currentResource -= skill.cost;
-      }
+      if (!spendResourceAmount(this.battle.player, resKey, skill.cost)) { this.log('Not enough resources.', false, 'status'); return false; }
       this.battle.skillCooldowns[skill.id] = skill.cooldown;
+      this.log(`You use ${skill.name}.`, false, 'status');
       skill.action({ player: this.battle.player, enemy: this.battle.enemy, playerStats, enemyStats, isBoss: this.battle.isBoss });
-      if (this.usesRageResource()) addRage(4);
+      const gainAfterSkill = resourceRules[resKey]?.gainOnAttack || 0;
+      if (gainAfterSkill) addResourceAmount(this.battle.player, resKey, gainAfterSkill / 2);
+      if (resourceRules[resKey]?.gainOnHeal && skill.tags?.includes('heal')) addResourceAmount(this.battle.player, resKey, resourceRules[resKey].gainOnHeal);
     } else {
       const dmg = this.calculateDamage(playerStats, enemyStats, { variance: 0.1, bonus: 1 });
       this.battle.enemy.currentHP -= dmg.amount;
@@ -2131,7 +2194,8 @@ const CombatSystem = {
         const tick = Math.round(playerStats.attack * this.battle.player.modifiers.bleed);
         this.applyStatus('enemy', { key: 'bleed', duration: 2, tick, type: 'dot', label: 'Bleed' });
       }
-      if (this.usesRageResource()) addRage(Math.max(3, Math.round(dmg.amount * 0.1)));
+      const gain = resourceRules[resKey]?.gainOnAttack;
+      if (gain) addResourceAmount(this.battle.player, resKey, gain);
     }
     updateBars();
     return true;
@@ -2169,7 +2233,9 @@ const CombatSystem = {
         if (this.battle.isBoss && player.modifiers.bossResist) taken = Math.round(taken * (1 - player.modifiers.bossResist));
         player.currentHP -= taken;
         logMessage(`${this.battle.enemy.name} hits you for ${taken}${dmg.crit ? ' (CRIT)' : ''}.`);
-        if (this.usesRageResource()) addRage(Math.max(2, Math.round(taken * 0.08)));
+        const { key } = getResourceState(player);
+        const gain = resourceRules[key]?.gainOnHit;
+        if (gain) addResourceAmount(player, key, Math.max(gain, Math.round(taken * 0.05)));
         if (player.modifiers.thorns) {
           const reflect = Math.max(1, Math.round(taken * player.modifiers.thorns));
           this.battle.enemy.currentHP -= reflect;
@@ -2326,11 +2392,17 @@ const CombatSystem = {
   renderSkillButtons() {
     const wrap = document.getElementById('skill-actions');
     wrap.innerHTML = '';
+    wrap.className = 'skill-bar';
     activeSkills[this.battle.player.class].forEach(skill => {
       const btn = document.createElement('button');
-      btn.className = 'skill-btn';
+      btn.className = 'skill-btn skill-slot';
       btn.id = `skill-${skill.id}`;
-      btn.innerHTML = `<div>${skill.name}</div><div class="small">${skill.cost} ${classResources[this.battle.player.class]}</div><div class="cooldown"></div>`;
+      btn.innerHTML = `
+        <div class="skill-icon" title="${skill.description || ''}">${skill.name.charAt(0)}</div>
+        <div class="skill-meta">${skill.cost} ${formatResourceName(classResources[this.battle.player.class])}</div>
+        <div class="cooldown"></div>
+        <div class="cooldown-overlay"></div>
+        <div class="skill-label">${skill.name}</div>`;
       btn.onclick = () => this.playerAction('skill', skill.id);
       wrap.appendChild(btn);
     });
@@ -2339,8 +2411,8 @@ const CombatSystem = {
     if (!skill) return false;
     const cd = this.battle.skillCooldowns[skill.id] || 0;
     if (cd > 0) return false;
-    if (this.usesRageResource()) return this.battle.player.rage >= skill.cost;
-    return this.battle.player.currentResource >= skill.cost;
+    const { key, state: resState } = getResourceState(this.battle.player);
+    return resState.current >= skill.cost;
   },
   updateActionButtons() {
     if (!this.battle) {
@@ -2351,13 +2423,24 @@ const CombatSystem = {
     }
     const attackBtn = document.getElementById('attack-btn');
     attackBtn.disabled = !this.active || this.turn !== 'player';
+    const { key: resKey, state: resState } = getResourceState(this.battle.player);
     activeSkills[this.battle.player.class].forEach(skill => {
       const btn = document.getElementById(`skill-${skill.id}`);
       if (!btn) return;
       const cd = this.battle.skillCooldowns[skill.id] || 0;
-      const canCast = this.canUseSkill(skill) && this.turn === 'player';
+      const enough = resState.current >= skill.cost;
+      const canCast = this.canUseSkill(skill) && this.turn === 'player' && enough;
       btn.classList.toggle('disabled', !canCast);
-      btn.querySelector('.cooldown').textContent = cd > 0 ? `CD ${cd}` : '';
+      btn.classList.toggle('no-resource', !enough);
+      const overlay = btn.querySelector('.cooldown-overlay');
+      if (overlay && skill.cooldown) {
+        const pct = Math.min(1, Math.max(0, cd / (skill.cooldown || 1)));
+        overlay.style.height = `${pct * 100}%`;
+      }
+      const cdEl = btn.querySelector('.cooldown');
+      if (cdEl) cdEl.textContent = cd > 0 ? `CD ${cd}` : '';
+      const meta = btn.querySelector('.skill-meta');
+      if (meta) meta.textContent = `${skill.cost} ${formatResourceName(resKey)}`;
       btn.disabled = !canCast;
     });
   },
@@ -2482,7 +2565,8 @@ function autoBattle() {
   if (CombatSystem.active) { logMessage('Finish the current battle before auto battling.'); return; }
   if (!isZoneUnlocked(state.currentZone)) { logMessage('Defeat the zone boss to progress before auto battling.'); return; }
   const zone = zones[state.currentZone];
-  let count = parseInt(document.getElementById('auto-count').value, 10);
+  const countEl = document.getElementById('auto-count');
+  let count = parseInt(countEl ? countEl.value : '1', 10);
   if (Number.isNaN(count) || count < 1) count = 1;
   count = Math.min(20, count);
   const derived = applyBonuses(state.player.baseStats, state.player);
@@ -2576,11 +2660,13 @@ function finishCombat(result, bossFlag) {
     state.dungeonRun = null;
   }
   player.currentHP = Math.min(applyBonuses(player.baseStats, player).maxHP, player.currentHP <= 0 ? applyBonuses(player.baseStats, player).maxHP : player.currentHP);
-  if (usesRage(player)) {
+  const { key: resKey } = getResourceState(player);
+  if (resKey === 'rage') {
     player.rage = Math.max(0, Math.min(player.maxRage, player.rage));
     updateRageBar(player);
   } else {
-    player.currentResource = Math.min(player.currentResource + 4, player.maxResource);
+    const rule = resourceRules[resKey] || {};
+    addResourceAmount(player, resKey, rule.regen || 4);
   }
   if (state.foodBuff && state.foodBuff.battles > 0) {
     state.foodBuff.battles -= 1;
@@ -3306,14 +3392,9 @@ function renderMapPanel() {
 function renderRebirthPanel() {
   const panel = document.getElementById('rebirth-panel');
   if (!panel) return;
-  panel.innerHTML = `<div class="system-card"><h5>Ascension</h5><div class="small muted">Reset progress after level 20 for permanent bonuses.</div><div class="small">Ascensions: ${state.ascension.count || 0}</div><div class="small">Points: ${state.ascension.points || 0}</div><button class="danger" id="ascend-btn">Ascend</button></div>`;
+  panel.innerHTML = `<div class="system-card"><h5>Ascension</h5><div class="small muted">Reset at level 50+ for permanent bonuses (up to 30 ascensions).</div><div class="small">Ascensions: ${state.ascension.count || 0}</div><div class="small">Points: ${state.ascension.points || 0}</div><button class="danger" id="ascend-btn">Ascend</button></div>`;
   const btn = document.getElementById('ascend-btn');
-  if (btn) btn.onclick = () => {
-    if (state.player.level < 20) { logMessage('Reach level 20 to ascend.'); return; }
-    state.ascension.count = (state.ascension.count || 0) + 1;
-    state.ascension.points = (state.ascension.points || 0) + 2;
-    prestige();
-  };
+  if (btn) btn.onclick = () => ascend();
 }
 
 function renderHistoryPanel() {
@@ -3584,6 +3665,7 @@ function updateLifeSkillCooldownCards() {
     if (!actionId) return;
     const cd = getActionCooldownState(actionId);
     card.classList.toggle('on-cooldown', !cd.ready);
+    card.style.display = cd.ready ? '' : 'none';
     const status = card.querySelector('.life-skill-cooldown');
     if (status) status.textContent = cd.ready ? 'Ready' : `Cooldown ${formatCooldown(cd.remaining)}`;
   });
@@ -4416,16 +4498,18 @@ function renderTopbar() {
   document.getElementById('player-prestige').textContent = `Prestige ${state.prestige || 0}`;
   p.currentHP = Math.min(derived.maxHP, Math.max(0, p.currentHP));
   updateHealthBar(p, playerHpBar, playerHpText, derived.maxHP);
-  const usesRageResource = usesRage(p);
+  ensureResources(p);
+  const { key: resKey, state: resState } = getResourceState(p);
+  const usesRageResource = resKey === 'rage';
   const manaBar = document.querySelector('.bar.mana');
   if (rageContainer) rageContainer.style.display = usesRageResource ? 'block' : 'none';
   if (manaBar) manaBar.style.display = usesRageResource ? 'none' : 'block';
   if (usesRageResource) {
     updateRageBar(p);
   }
-  const resPct = Math.max(0, Math.min(1, p.currentResource / Math.max(1, p.maxResource)));
+  const resPct = Math.max(0, Math.min(1, resState.current / Math.max(1, resState.max)));
   document.getElementById('resource-bar').style.width = `${resPct * 100}%`;
-  document.getElementById('resource-text').textContent = `${classResources[p.class]}: ${Math.floor(p.currentResource)}/${p.maxResource}`;
+  document.getElementById('resource-text').textContent = `${formatResourceName(resKey)}: ${Math.floor(resState.current)}/${resState.max}`;
   const xpPct = Math.max(0, Math.min(1, p.xp / p.xpToNext));
   document.getElementById('xp-bar').style.width = `${xpPct * 100}%`;
   document.getElementById('xp-text').textContent = `${p.xp}/${p.xpToNext} XP`;
@@ -4547,7 +4631,17 @@ function updateBars() {
     const maxHP = derived.maxHP || derived.hp || 0;
     state.player.currentHP = Math.min(maxHP, Math.max(0, state.player.currentHP));
     updateHealthBar(state.player, playerHpBar, playerHpText, maxHP);
-    if (usesRage()) updateRageBar(state.player);
+    ensureResources(state.player);
+    const { key, state: resState } = getResourceState(state.player);
+    if (key === 'rage') {
+      updateRageBar(state.player);
+    } else {
+      const resPct = Math.max(0, Math.min(1, resState.current / Math.max(1, resState.max)));
+      const resBar = document.getElementById('resource-bar');
+      const resText = document.getElementById('resource-text');
+      if (resBar) resBar.style.width = `${resPct * 100}%`;
+      if (resText) resText.textContent = `${formatResourceName(key)}: ${Math.floor(resState.current)}/${resState.max}`;
+    }
   }
   if (!state.currentEnemy) return;
   const enemyBar = document.querySelector('.bar.enemy');
@@ -4575,6 +4669,38 @@ function updateAll() {
   CombatSystem.updateActionButtons();
   updateFightButtons();
   scheduleSave();
+}
+
+function ascend() {
+  if (!state.player) return;
+  if (state.player.level < 50) { logMessage('Reach level 50 to ascend.'); return; }
+  if ((state.ascension.count || 0) >= 30) { logMessage('Ascension cap reached.'); return; }
+  state.ascension.count = (state.ascension.count || 0) + 1;
+  state.ascension.points = (state.ascension.points || 0) + 1;
+  const bonus = state.ascension.bonuses || { attackPct: 0, critPct: 0, hpPct: 0, regen: 0, drop: 0, egg: 0 };
+  bonus.attackPct += 0.02;
+  bonus.critPct += 0.02;
+  bonus.hpPct += 0.02;
+  bonus.regen += 1;
+  bonus.drop += 0.01;
+  bonus.egg += 0.01;
+  state.ascension.bonuses = bonus;
+  const cls = state.player.class;
+  state.player = createPlayer(cls);
+  state.inventory = [];
+  state.eggs = [];
+  state.dragons = [];
+  state.activeDragon = null;
+  state.unlockedZones = 1;
+  state.defeatedBossIds = [];
+  state.currentZone = 0;
+  state.questProgress = { daily: {}, weekly: {}, zone: {} };
+  state.chests = {};
+  state.tower = { floor: 1, best: 1 };
+  state.worldBoss = { lastClear: 0 };
+  ensureMetaSystems();
+  logMessage('You ascended! Permanent bonuses applied.');
+  updateAll();
 }
 
 function prestige() {
@@ -4731,9 +4857,12 @@ function initGame() {
   initGateBossButton();
   renderZones();
   renderEpicActionsMounts();
-  document.getElementById('fight-btn').onclick = () => startFight(false);
-  document.getElementById('boss-btn').onclick = () => startFight(true);
-  document.getElementById('auto-btn').onclick = () => autoBattle();
+  const fightBtn = document.getElementById('fight-btn');
+  if (fightBtn) fightBtn.onclick = () => startFight(false);
+  const bossBtn = document.getElementById('boss-btn');
+  if (bossBtn) bossBtn.onclick = () => startFight(true);
+  const autoBtn = document.getElementById('auto-btn');
+  if (autoBtn) autoBtn.onclick = () => autoBattle();
   document.getElementById('attack-btn').onclick = () => CombatSystem.playerAction('attack');
   document.getElementById('refresh-shop').onclick = () => { generateShop(); renderShop(); saveGame(); };
   setInterval(() => updateEpicActionTimers(), 1000);
