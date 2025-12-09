@@ -139,7 +139,7 @@ body.animations-off *::after {
   -webkit-overflow-scrolling: touch;
 }
 .nav-title { color: var(--color-muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; padding: 6px 10px; }
-.nav-link {
+.nav-item {
   background: transparent;
   border: 1px solid var(--color-border);
   color: var(--color-text);
@@ -149,12 +149,29 @@ body.animations-off *::after {
   text-align: left;
   transition: all 0.2s ease;
 }
-.nav-link:hover { border-color: var(--color-accent); box-shadow: 0 0 0 1px rgba(79, 140, 255, 0.25); }
-.nav-link.active { background: rgba(79, 140, 255, 0.12); border-color: var(--color-accent); }
+.nav-item:hover { border-color: var(--color-accent); box-shadow: 0 0 0 1px rgba(79, 140, 255, 0.25); }
+.nav-item.is-active { background: rgba(79, 140, 255, 0.12); border-color: var(--color-accent); }
 
-.content { padding: 18px; display: flex; flex-direction: column; gap: 18px; }
-.view-section { background: rgba(255, 255, 255, 0.01); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 16px; box-shadow: var(--shadow-soft); }
+.main-content { padding: 18px; display: flex; flex-direction: column; gap: 18px; }
 .view-header { margin-bottom: 12px; }
+
+.player-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 12px 10px;
+  margin-bottom: 10px;
+  border-radius: 12px;
+  background: rgba(15,23,42,0.75);
+  border: 1px solid rgba(148,163,184,0.15);
+}
+
+.player-name-row { display: flex; gap: 12px; align-items: baseline; }
+.player-name-row #player-header-name { font-weight: 600; font-size: 1rem; }
+.player-stats-row { display: flex; flex-wrap: wrap; gap: 12px; font-size: 0.8rem; opacity: 0.9; }
+
+.main-panel { display: none; }
+.main-panel.is-visible { display: block; }
 .section-title { font-size: 1.15rem; font-weight: 700; }
 .section-sub { color: var(--color-muted); }
 
@@ -224,7 +241,7 @@ body.animations-off *::after {
   .header-meta { align-items: flex-start; }
   .app-body { grid-template-columns: 1fr; }
   .sidebar { position: sticky; top: 0; height: auto; flex-direction: row; flex-wrap: nowrap; overflow-x: auto; border-right: none; border-bottom: 1px solid var(--color-border); background: rgba(17, 26, 41, 0.9); z-index: 9; }
-  .sidebar .nav-link { white-space: nowrap; flex: 1 0 auto; }
+  .sidebar .nav-item { white-space: nowrap; flex: 1 0 auto; }
   .content { padding: 14px; }
   .combat-grid { grid-template-columns: 1fr; }
 }
@@ -321,7 +338,7 @@ body.colorblind-mode {
 .skill-node::before { content: ''; position: absolute; left: -10px; top: 50%; width: 10px; height: 2px; background: var(--color-border); }
 .skill-node.unlocked { border-color: var(--color-success); box-shadow: 0 0 8px rgba(102, 187, 106, 0.4); }
 
-.action-bar button, .tabs button, .nav-link, .filters .wide, .shop-header button, #fight-btn, #boss-btn, #auto-btn, #sell-filtered, #prestige-btn, #reset-btn, #refresh-shop {
+.action-bar button, .tabs button, .nav-item, .filters .wide, .shop-header button, #fight-btn, #boss-btn, #auto-btn, #sell-filtered, #prestige-btn, #reset-btn, #refresh-shop {
   font-weight: 600;
 }
 
@@ -383,6 +400,24 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .breeding-row, #enhance-panel, #fusion-panel { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 8px 0; }
 select { background: var(--color-panel); color: var(--color-text); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 6px; }
 
+.gear-tooltip {
+  position: fixed;
+  min-width: 220px;
+  max-width: 320px;
+  background: #020617;
+  border-radius: 10px;
+  padding: 8px 10px;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.6);
+  font-size: 0.8rem;
+  z-index: 9999;
+  pointer-events: none;
+  border: 1px solid rgba(255,255,255,0.06);
+}
+.gear-tooltip .item-name { font-weight: 600; margin-bottom: 4px; }
+.gear-tooltip .item-rarity { font-size: 0.7rem; opacity: 0.8; text-transform: uppercase; }
+.gear-tooltip .stat-line { display: flex; justify-content: space-between; }
+.gear-tooltip hr { border: none; border-top: 1px solid rgba(255,255,255,0.08); margin: 6px 0; }
+
 
 @media (max-width: 1200px) {
   .combat-grid { grid-template-columns: 1fr; }
@@ -392,7 +427,7 @@ select { background: var(--color-panel); color: var(--color-text); border: 1px s
 }
 
 @media (max-width: 720px) {
-  .content { padding: 12px; }
-  .nav-link { flex: 1 1 calc(50% - 8px); }
+  .main-content { padding: 12px; }
+  .nav-item { flex: 1 1 calc(50% - 8px); }
   .sidebar { gap: 6px; }
 }

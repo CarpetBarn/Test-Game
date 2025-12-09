@@ -3240,34 +3240,24 @@ function buyShopItem(item) {
   updateAll();
 }
 
-function renderTabs() {
-  document.querySelectorAll('.tabs button').forEach(btn => {
+function initSidebarNavigation() {
+  const navItems = document.querySelectorAll('.nav-item');
+  const panels = document.querySelectorAll('.main-panel');
+  function showPanel(panelId) {
+    panels.forEach(panel => panel.classList.toggle('is-visible', panel.id === panelId));
+  }
+  navItems.forEach(btn => {
+    const targetId = btn.dataset.section;
     btn.addEventListener('click', () => {
-      document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
-      btn.classList.add('active');
-      document.getElementById(btn.dataset.tab).classList.add('active');
+      navItems.forEach(n => n.classList.remove('is-active'));
+      btn.classList.add('is-active');
+      if (targetId) showPanel(targetId);
     });
   });
-}
-
-function wireNavigation() {
-  const navLinks = document.querySelectorAll('.nav-link');
-  navLinks.forEach(btn => {
-    btn.addEventListener('click', () => {
-      navLinks.forEach(n => n.classList.remove('active'));
-      btn.classList.add('active');
-      const target = btn.dataset.target;
-      if (target) {
-        const tabBtn = document.querySelector(`.tabs button[data-tab="${target}"]`);
-        if (tabBtn) tabBtn.click();
-        const section = document.getElementById(target);
-        if (section) {
-          section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-      }
-    });
-  });
+  const initiallyActive = document.querySelector('.nav-item.is-active');
+  if (initiallyActive && initiallyActive.dataset.section) {
+    showPanel(initiallyActive.dataset.section);
+  }
 }
 
 function renderZones() {
@@ -3412,6 +3402,13 @@ function updateFightButtons() {
   }
 }
 
+function registerGearHover(element, item) {
+  if (!element || !item) return;
+  element.classList.add('gear-item');
+  element.dataset.itemId = item.id;
+  element._itemRef = item;
+}
+
 function renderEquipment() {
   const wrap = document.getElementById('equipment-slots');
   wrap.innerHTML = '';
@@ -3446,6 +3443,7 @@ function renderEquipment() {
         info.appendChild(runeRow);
       }
       div.appendChild(info);
+      registerGearHover(div, item);
     }
     wrap.appendChild(div);
   });
@@ -3502,6 +3500,8 @@ function renderInventory() {
       const arrow = better ? '<span class="better-arrow">↑</span>' : '';
       const enh = item.enhancementLevel ? `+${item.enhancementLevel} ` : '';
       const element = item.element ? `<span class="tiny muted">${item.element}</span>` : '';
+      card.classList.add('gear-item');
+      card.dataset.itemId = item.id;
       card.innerHTML = `<div class="name ${item.rarity}">${enh}${item.name}${arrow}</div><div class="small">Requires Lv ${item.levelReq} • Slot: ${item.slot}</div><div class="small">Power ${item.power}</div>${element}`;
       (item.stats || []).forEach(s => {
         const stat = document.createElement('div');
@@ -3509,6 +3509,7 @@ function renderInventory() {
         stat.textContent = `+${s.value} ${s.label}`;
         card.appendChild(stat);
       });
+      registerGearHover(card, item);
       const row = document.createElement('div');
       const equipBtn = document.createElement('button');
       equipBtn.textContent = 'Equip';
@@ -3521,6 +3522,61 @@ function renderInventory() {
       card.appendChild(row);
     }
     wrap.appendChild(card);
+  });
+}
+
+function formatItemTooltip(item) {
+  if (!item) return '';
+  const lines = [];
+  const enh = item.enhancementLevel ? `+${item.enhancementLevel} ` : '';
+  lines.push(`<div class="item-name item-rarity-${item.rarity}">${enh}${item.name}</div>`);
+  if (item.rarity) lines.push(`<div class="item-rarity">${item.rarity.toUpperCase()}</div>`);
+  if (item.levelReq) lines.push(`<div class="item-level">Requires Lv ${item.levelReq}</div>`);
+  if (item.slot) lines.push(`<div class="item-slot tiny muted">Slot: ${item.slot}</div>`);
+  lines.push('<hr />');
+  if (item.stats && item.stats.length) {
+    item.stats.forEach(s => {
+      lines.push(`<div class="stat-line"><span>${s.label}</span><span>+${s.value}</span></div>`);
+    });
+  }
+  if (item.power) lines.push(`<div class="stat-line"><span>Power</span><span>${item.power}</span></div>`);
+  if (item.element) lines.push(`<div class="stat-line"><span>Element</span><span>${item.element}</span></div>`);
+  if (item.sockets) lines.push(`<div class="stat-line"><span>Sockets</span><span>${item.sockets}</span></div>`);
+  return lines.join('');
+}
+
+function findItemById(id) {
+  if (!id) return null;
+  const equipped = Object.values(state.player?.equipment || {}).find(it => it?.id === id);
+  if (equipped) return equipped;
+  return state.inventory.find(it => it.id === id) || null;
+}
+
+function initGearTooltips() {
+  const tooltip = document.getElementById('gear-tooltip');
+  if (!tooltip) return;
+  function showTooltip(item, x, y) {
+    tooltip.innerHTML = formatItemTooltip(item);
+    tooltip.style.left = `${x + 12}px`;
+    tooltip.style.top = `${y + 12}px`;
+    tooltip.hidden = false;
+  }
+  function hideTooltip() { tooltip.hidden = true; }
+  document.addEventListener('mouseover', (e) => {
+    const el = e.target.closest('.gear-item');
+    if (!el) return;
+    const item = el._itemRef || findItemById(el.dataset.itemId);
+    if (!item) return;
+    showTooltip(item, e.clientX, e.clientY);
+  });
+  document.addEventListener('mousemove', (e) => {
+    if (tooltip.hidden) return;
+    tooltip.style.left = `${e.clientX + 12}px`;
+    tooltip.style.top = `${e.clientY + 12}px`;
+  });
+  document.addEventListener('mouseout', (e) => {
+    if (e.relatedTarget && e.relatedTarget.closest('.gear-item')) return;
+    hideTooltip();
   });
 }
 
@@ -4092,6 +4148,28 @@ function renderTopbar() {
   document.getElementById('xp-text').textContent = `${p.xp}/${p.xpToNext} XP`;
 }
 
+function updatePlayerHeader() {
+  if (!state.player) return;
+  const p = state.player;
+  const derived = applyBonuses(p.baseStats, p);
+  const nameEl = document.getElementById('player-header-name');
+  const classEl = document.getElementById('player-header-class');
+  const lvlEl = document.getElementById('player-header-level');
+  const hpEl = document.getElementById('player-header-hp');
+  const atkEl = document.getElementById('player-header-atk');
+  const defEl = document.getElementById('player-header-def');
+  const critEl = document.getElementById('player-header-crit');
+  const speedEl = document.getElementById('player-header-speed');
+  if (nameEl) nameEl.textContent = p.name;
+  if (classEl) classEl.textContent = p.class;
+  if (lvlEl) lvlEl.textContent = `Lv ${p.level}`;
+  if (hpEl) hpEl.textContent = `${Math.floor(p.currentHP)}/${derived.maxHP}`;
+  if (atkEl) atkEl.textContent = derived.attack;
+  if (defEl) defEl.textContent = derived.defense;
+  if (critEl) critEl.textContent = `${Math.round(derived.crit)}%`;
+  if (speedEl) speedEl.textContent = Math.round(derived.speed || 0);
+}
+
 function updateBars() {
   if (state.player && playerHpBar) {
     const derived = applyBonuses(state.player.baseStats, state.player);
@@ -4108,6 +4186,7 @@ function updateBars() {
 
 function updateAll() {
   renderTopbar();
+  updatePlayerHeader();
   renderZones();
   renderEquipment();
   renderInventory();
@@ -4253,8 +4332,7 @@ function setupClassSelection() {
 
 function initGame() {
   ensureLifeSkills();
-  renderTabs();
-  wireNavigation();
+  initSidebarNavigation();
   renderZones();
   document.getElementById('fight-btn').onclick = () => startFight(false);
   document.getElementById('boss-btn').onclick = () => startFight(true);
@@ -4280,6 +4358,7 @@ window.onload = () => {
   loadSettings();
   applySettings();
   initSettingsCards();
+  initGearTooltips();
   if (!loadGame()) {
     setupClassSelection();
   } else {
