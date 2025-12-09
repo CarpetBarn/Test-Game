@@ -2583,6 +2583,30 @@ function performLifeAction(skillId, action) {
   updateAll();
 }
 
+function handleLifeSkillCardClick(skillId) {
+  state.selectedLifeSkill = skillId;
+  const actionKey = lifeSkillActionMap[skillId];
+  const cd = actionKey ? getActionCooldownState(actionKey) : { ready: true, remaining: 0 };
+  const actions = lifeActions[skillId] || [];
+  const recipes = recipeBook[skillId] || [];
+  if (actionKey && !cd.ready) {
+    logMessage(`${lifeSkillDefs[skillId].name} is on cooldown (${formatCooldown(cd.remaining)}).`);
+    renderLifeSkillsTab();
+    return;
+  }
+  if (actions.length) {
+    performLifeAction(skillId, actions[0]);
+    return;
+  }
+  if (recipes.length) {
+    renderLifeSkillsTab();
+    document.getElementById('life-recipes')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    logMessage('Select a recipe below to work this profession.');
+    return;
+  }
+  renderLifeSkillsTab();
+}
+
 function craftRecipe(skillId, recipe) {
   const actionKey = lifeSkillActionMap[skillId];
   if (actionKey && !isActionReady(actionKey)) { logMessage('Action is on cooldown.'); return; }
@@ -3112,6 +3136,20 @@ function updateEpicActionTimers() {
   renderJobsPanel();
   renderTowerPanel();
   renderWorldBossPanel();
+  updateLifeSkillCooldownCards();
+}
+
+function updateLifeSkillCooldownCards() {
+  const cards = document.querySelectorAll('#life-skill-list .life-skill');
+  cards.forEach(card => {
+    const skillId = card.dataset.skillId;
+    const actionId = lifeSkillActionMap[skillId];
+    if (!actionId) return;
+    const cd = getActionCooldownState(actionId);
+    card.classList.toggle('on-cooldown', !cd.ready);
+    const status = card.querySelector('.life-skill-cooldown');
+    if (status) status.textContent = cd.ready ? 'Ready' : `Cooldown ${formatCooldown(cd.remaining)}`;
+  });
 }
 
 function updateFightButtons() {
@@ -3624,11 +3662,15 @@ function renderLifeSkillsTab() {
   ensureLifeSkills();
   const list = document.getElementById('life-skill-list');
   if (!list) return;
+  if (!state.selectedLifeSkill) state.selectedLifeSkill = Object.keys(lifeSkillDefs)[0];
   list.innerHTML = '';
   Object.entries(lifeSkillDefs).forEach(([id, def]) => {
     const skill = state.lifeSkills[id];
     const card = document.createElement('div');
-    card.className = `life-skill ${state.selectedLifeSkill === id ? 'active' : ''}`;
+    const actionKey = lifeSkillActionMap[id];
+    const cd = actionKey ? getActionCooldownState(actionKey) : { ready: true, remaining: 0 };
+    card.className = `life-skill life-skill-card ${state.selectedLifeSkill === id ? 'active' : ''} ${cd.ready ? '' : 'on-cooldown'}`;
+    card.dataset.skillId = id;
     card.innerHTML = `<div class="flex"><strong>${def.name}</strong><span class="small">Lv ${skill.level}</span></div><div class="small">${def.desc}</div>`;
     const bar = document.createElement('div');
     bar.className = 'life-bar';
@@ -3639,11 +3681,18 @@ function renderLifeSkillsTab() {
     label.textContent = `${skill.currentXP}/${skill.xpToNext}`;
     bar.appendChild(fill); bar.appendChild(label);
     card.appendChild(bar);
-    card.onclick = () => { state.selectedLifeSkill = id; renderLifeSkillsTab(); };
+    if (actionKey) {
+      const status = document.createElement('div');
+      status.className = 'life-skill-cooldown';
+      status.textContent = cd.ready ? 'Ready' : `Cooldown ${formatCooldown(cd.remaining)}`;
+      card.appendChild(status);
+    }
+    card.onclick = () => handleLifeSkillCardClick(id);
     list.appendChild(card);
   });
   renderMaterials();
   renderLifeActions();
+  updateLifeSkillCooldownCards();
 }
 
 function renderMaterials() {
@@ -3673,44 +3722,24 @@ function renderLifeActions() {
   const recipeWrap = document.getElementById('life-recipes');
   const title = document.getElementById('life-selected-title');
   const meta = document.getElementById('life-selected-meta');
-  const primary = document.getElementById('life-perform-btn');
   if (!actionsWrap || !recipeWrap || !title) return;
   actionsWrap.innerHTML = '';
   recipeWrap.innerHTML = '';
   const id = state.selectedLifeSkill || 'mining';
   const skill = state.lifeSkills[id];
   title.textContent = `${lifeSkillDefs[id].name} Actions`;
-  if (meta) meta.textContent = `Level ${skill.level} • ${skill.currentXP}/${skill.xpToNext} XP`;
-  const actionLabels = {
-    mining: 'Mine', foraging: 'Forage', fishing: 'Fish', hunting: 'Hunt', refining: 'Refine',
-    blacksmithing: 'Craft Item', alchemy: 'Brew Potion', cooking: 'Cook Meal', enchanting: 'Apply Enchant',
-    dragonHandling: 'Handle Dragon', dragonBonding: 'Bond Dragon', trading: 'Trade',
-  };
-  if (primary) {
-    const actionKey = lifeSkillActionMap[id];
-    const cd = actionKey ? getActionCooldownState(actionKey) : { ready: true, remaining: 0 };
-    const label = actionLabels[id] || 'Perform';
-    primary.textContent = cd.ready ? label : `${label} (${formatCooldown(cd.remaining)})`;
-    const actions = lifeActions[id] || [];
-    primary.onclick = () => {
-      if (actions.length) {
-        performLifeAction(id, actions[0]);
-      } else {
-        const recipes = recipeBook[id] || [];
-        if (recipes.length) {
-          document.getElementById('life-recipes')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          logMessage('Select a recipe below to work this profession.');
-        }
-      }
-    };
-    primary.disabled = ((!(lifeActions[id] && lifeActions[id].length) && !(recipeBook[id] && recipeBook[id].length)) || !cd.ready);
+  const actionKey = lifeSkillActionMap[id];
+  const cd = actionKey ? getActionCooldownState(actionKey) : { ready: true, remaining: 0 };
+  if (meta) {
+    const readyText = actionKey ? (cd.ready ? 'Ready' : `Cooldown ${formatCooldown(cd.remaining)}`) : '';
+    meta.textContent = `Level ${skill.level} • ${skill.currentXP}/${skill.xpToNext} XP${readyText ? ' • ' + readyText : ''}`;
   }
   const actions = lifeActions[id] || [];
   if (!actions.length) { actionsWrap.innerHTML = '<div class="small">No active buttons here. Practice via crafting or battle hooks.</div>'; }
   actions.forEach(act => {
     const div = document.createElement('div');
     div.className = 'life-action';
-    div.innerHTML = `<div class="flex"><strong>${act.label}</strong><span class="small">+${act.xp} XP</span></div><div class="tiny muted">Use the action button above.</div>`;
+    div.innerHTML = `<div class="flex"><strong>${act.label}</strong><span class="small">+${act.xp} XP</span></div><div class="tiny muted">Tap the skill card to perform.</div>`;
     actionsWrap.appendChild(div);
   });
   if (id === 'dragonHandling') {
