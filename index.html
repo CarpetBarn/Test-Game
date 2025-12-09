@@ -76,17 +76,41 @@
 
       <main class="main-content">
         <header class="player-header">
-          <div class="player-name-row">
-            <span id="player-header-name">Adventurer</span>
-            <span id="player-header-class" class="pill soft"></span>
-            <span id="player-header-level" class="pill"></span>
+          <div class="player-header-top">
+            <div class="player-identity">
+              <span id="player-name" class="player-name">Adventurer</span>
+              <span id="player-class" class="player-badge player-class">Warrior</span>
+              <span id="player-level" class="player-badge player-level">Lv 1</span>
+            </div>
+            <div class="player-core-stats">
+              <span>HP: <span id="player-hp">0 / 0</span></span>
+              <span>ATK: <span id="player-atk">0</span></span>
+              <span>DEF: <span id="player-def">0</span></span>
+              <span>CRIT: <span id="player-crit">0%</span></span>
+              <span>SPD: <span id="player-speed">0</span></span>
+            </div>
+            <button id="player-stats-toggle" class="player-stats-toggle">Show details</button>
           </div>
-          <div class="player-stats-row">
-            <span>HP: <span id="player-header-hp">0 / 0</span></span>
-            <span>ATK: <span id="player-header-atk">0</span></span>
-            <span>DEF: <span id="player-header-def">0</span></span>
-            <span>CRIT: <span id="player-header-crit">0%</span></span>
-            <span>SPD: <span id="player-header-speed">0</span></span>
+          <div id="player-stats-details" class="player-stats-details" hidden>
+            <div class="stats-grid">
+              <div class="stat-cell"><span class="label">Accuracy</span><span id="stat-accuracy" class="value">-</span></div>
+              <div class="stat-cell"><span class="label">Evasion</span><span id="stat-evasion" class="value">-</span></div>
+              <div class="stat-cell"><span class="label">Block Chance</span><span id="stat-block" class="value">-</span></div>
+              <div class="stat-cell"><span class="label">Crit Damage</span><span id="stat-crit-dmg" class="value">-</span></div>
+              <div class="stat-cell"><span class="label">Lifesteal</span><span id="stat-life-steal" class="value">-</span></div>
+              <div class="stat-cell"><span class="label">Fire ATK</span><span id="stat-fire-atk" class="value">-</span></div>
+              <div class="stat-cell"><span class="label">Frost ATK</span><span id="stat-frost-atk" class="value">-</span></div>
+              <div class="stat-cell"><span class="label">Shadow ATK</span><span id="stat-shadow-atk" class="value">-</span></div>
+              <div class="stat-cell"><span class="label">Fire RES</span><span id="stat-fire-res" class="value">-</span></div>
+              <div class="stat-cell"><span class="label">Frost RES</span><span id="stat-frost-res" class="value">-</span></div>
+              <div class="stat-cell"><span class="label">Shadow RES</span><span id="stat-shadow-res" class="value">-</span></div>
+              <div class="stat-cell"><span class="label">XP Bonus</span><span id="stat-bonus-xp" class="value">-</span></div>
+              <div class="stat-cell"><span class="label">Gold Bonus</span><span id="stat-bonus-gold" class="value">-</span></div>
+              <div class="stat-cell"><span class="label">Loot Bonus</span><span id="stat-bonus-loot" class="value">-</span></div>
+              <div class="stat-cell"><span class="label">CDR</span><span id="stat-cdr" class="value">-</span></div>
+              <div class="stat-cell"><span class="label">Boss DMG</span><span id="stat-boss-dmg" class="value">-</span></div>
+              <div class="stat-cell"><span class="label">Dungeon DMG</span><span id="stat-dungeon-dmg" class="value">-</span></div>
+            </div>
           </div>
         </header>
 

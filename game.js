@@ -1453,7 +1453,7 @@ function createPlayer(cls) {
 function ensureModifierDefaults(player) {
   const defaults = { attack: 0, defense: 0, hp: 0, crit: 0, critdmg: 0, doubleHit: 0, dodge: 0, poison: 0, heal: 0, vsUndead: 0, vsBeast: 0, xpBoost: 0, lootBoost: 0, bossResist: 0, healAfterBoss: 0, lifesteal: 0,
     regen: 0, thorns: 0, potionBoost: 0, goldBoost: 0, barrier: 0, eggBoost: 0, dragonBond: 0, spellAmp: 0, fury: 0, bleed: 0, shred: 0 };
-  player.modifiers = { ...defaults, ...(player.modifiers || {}) };
+  player.modifiers = { ...defaults, accuracy: 0, fire: 0, frost: 0, shadow: 0, fireRes: 0, frostRes: 0, shadowRes: 0, cooldownReduction: 0, bossDamage: 0, dungeonDamage: 0, autoBattle: 0, ...(player.modifiers || {}) };
   player.flat = { speed: 0, elemental: 0, hp: 0, attack: 0, ...(player.flat || {}) };
   player.maxResource = player.maxResource || player.baseStats.mana || 30;
   player.currentResource = player.currentResource || player.maxResource;
@@ -4185,33 +4185,108 @@ function renderTopbar() {
   document.getElementById('xp-text').textContent = `${p.xp}/${p.xpToNext} XP`;
 }
 
-function updatePlayerHeader() {
-  if (!state.player) return;
+function formatPercent(val) {
+  const num = Math.round((val || 0) * 100) / 100;
+  return `${num}%`;
+}
+
+function refreshPlayerStats() {
+  if (!state.player) return null;
   const p = state.player;
   const derived = applyBonuses(p.baseStats, p);
-  const nameEl = document.getElementById('player-header-name');
-  const classEl = document.getElementById('player-header-class');
-  const lvlEl = document.getElementById('player-header-level');
-  const hpEl = document.getElementById('player-header-hp');
-  const atkEl = document.getElementById('player-header-atk');
-  const defEl = document.getElementById('player-header-def');
-  const critEl = document.getElementById('player-header-crit');
-  const speedEl = document.getElementById('player-header-speed');
+  const stats = {
+    maxHP: derived.maxHP,
+    attack: derived.attack,
+    defense: derived.defense,
+    critChance: Math.round(derived.crit || 0),
+    critDamage: Math.round((derived.critdmg || 0) * 100),
+    speed: Math.round(derived.speed || 0),
+    accuracy: Math.round(100 + (p.modifiers.accuracy || 0) * 100),
+    evasion: Math.round((p.modifiers.dodge || 0) * 100),
+    blockChance: Math.round((p.modifiers.barrier || 0) * 100),
+    lifeSteal: Math.round((derived.lifesteal || p.modifiers.lifesteal || 0) * 100),
+    elementalAttackFire: Math.round(p.modifiers.fire || 0),
+    elementalAttackFrost: Math.round(p.modifiers.frost || 0),
+    elementalAttackShadow: Math.round(p.modifiers.shadow || 0),
+    elementalResFire: Math.round((p.modifiers.fireRes || 0) * 100),
+    elementalResFrost: Math.round((p.modifiers.frostRes || 0) * 100),
+    elementalResShadow: Math.round((p.modifiers.shadowRes || 0) * 100),
+    bonusXP: Math.round((p.modifiers.xpBoost || 0) * 100),
+    bonusGold: Math.round((p.modifiers.goldBoost || 0) * 100),
+    bonusLoot: Math.round(((p.modifiers.lootBoost || 0) + (derived.lootBuff || 0)) * 100),
+    cooldownReduction: Math.round((p.modifiers.cooldownReduction || 0) * 100),
+    bossDamageBonus: Math.round((p.modifiers.bossDamage || 0) * 100),
+    dungeonDamageBonus: Math.round((p.modifiers.dungeonDamage || 0) * 100),
+    autoBattleEfficiency: Math.round((p.modifiers.autoBattle || 0) * 100),
+    element: derived.element || 'physical',
+  };
+  p.stats = stats;
+  return { derived, stats };
+}
+
+function updatePlayerHeader() {
+  if (!state.player) return;
+  if (!state.player.stats) refreshPlayerStats();
+  const p = state.player;
+  const s = p.stats || {};
+  const nameEl = document.getElementById('player-name');
+  const classEl = document.getElementById('player-class');
+  const lvlEl = document.getElementById('player-level');
+  const hpEl = document.getElementById('player-hp');
+  const atkEl = document.getElementById('player-atk');
+  const defEl = document.getElementById('player-def');
+  const critEl = document.getElementById('player-crit');
+  const speedEl = document.getElementById('player-speed');
   if (nameEl) nameEl.textContent = p.name;
   if (classEl) classEl.textContent = p.class;
   if (lvlEl) lvlEl.textContent = `Lv ${p.level}`;
-  if (hpEl) hpEl.textContent = `${Math.floor(p.currentHP)}/${derived.maxHP}`;
-  if (atkEl) atkEl.textContent = derived.attack;
-  if (defEl) defEl.textContent = derived.defense;
-  if (critEl) critEl.textContent = `${Math.round(derived.crit)}%`;
-  if (speedEl) speedEl.textContent = Math.round(derived.speed || 0);
+  if (hpEl) hpEl.textContent = `${Math.floor(p.currentHP)}/${s.maxHP || 0}`;
+  if (atkEl) atkEl.textContent = s.attack ?? '-';
+  if (defEl) defEl.textContent = s.defense ?? '-';
+  if (critEl) critEl.textContent = `${s.critChance ?? 0}%`;
+  if (speedEl) speedEl.textContent = s.speed ?? '-';
+
+  const setVal = (id, val, percent) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = percent ? formatPercent(val) : (val ?? '-');
+  };
+  setVal('stat-accuracy', s.accuracy, true);
+  setVal('stat-evasion', s.evasion, true);
+  setVal('stat-block', s.blockChance, true);
+  setVal('stat-crit-dmg', s.critDamage, true);
+  setVal('stat-life-steal', s.lifeSteal, true);
+  setVal('stat-fire-atk', s.elementalAttackFire);
+  setVal('stat-frost-atk', s.elementalAttackFrost);
+  setVal('stat-shadow-atk', s.elementalAttackShadow);
+  setVal('stat-fire-res', s.elementalResFire, true);
+  setVal('stat-frost-res', s.elementalResFrost, true);
+  setVal('stat-shadow-res', s.elementalResShadow, true);
+  setVal('stat-bonus-xp', s.bonusXP, true);
+  setVal('stat-bonus-gold', s.bonusGold, true);
+  setVal('stat-bonus-loot', s.bonusLoot, true);
+  setVal('stat-cdr', s.cooldownReduction, true);
+  setVal('stat-boss-dmg', s.bossDamageBonus, true);
+  setVal('stat-dungeon-dmg', s.dungeonDamageBonus, true);
+}
+
+function initPlayerStatsToggle() {
+  const toggleBtn = document.getElementById('player-stats-toggle');
+  const details = document.getElementById('player-stats-details');
+  if (!toggleBtn || !details) return;
+  toggleBtn.addEventListener('click', () => {
+    const isHidden = details.hidden;
+    details.hidden = !isHidden;
+    toggleBtn.textContent = isHidden ? 'Hide details' : 'Show details';
+  });
 }
 
 function updateBars() {
   if (state.player && playerHpBar) {
-    const derived = applyBonuses(state.player.baseStats, state.player);
-    state.player.currentHP = Math.min(derived.maxHP, Math.max(0, state.player.currentHP));
-    updateHealthBar(state.player, playerHpBar, playerHpText, derived.maxHP);
+    const derived = state.player.stats || refreshPlayerStats()?.stats || applyBonuses(state.player.baseStats, state.player);
+    const maxHP = derived.maxHP || derived.hp || 0;
+    state.player.currentHP = Math.min(maxHP, Math.max(0, state.player.currentHP));
+    updateHealthBar(state.player, playerHpBar, playerHpText, maxHP);
     if (usesRage()) updateRageBar(state.player);
   }
   if (!state.currentEnemy) return;
@@ -4222,6 +4297,7 @@ function updateBars() {
 }
 
 function updateAll() {
+  refreshPlayerStats();
   renderTopbar();
   updatePlayerHeader();
   renderZones();
@@ -4370,6 +4446,7 @@ function setupClassSelection() {
 function initGame() {
   ensureLifeSkills();
   initSidebarNavigation();
+  initPlayerStatsToggle();
   renderZones();
   document.getElementById('fight-btn').onclick = () => startFight(false);
   document.getElementById('boss-btn').onclick = () => startFight(true);
