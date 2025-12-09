@@ -6,6 +6,9 @@ const ENEMY_ATTACK_MOD = 5 / 6; // global reduction to enemy attack power
 const MAX_LEVEL = 200;
 const MAX_COMBAT_LOG_ENTRIES = 10;
 const EGG_DROP_BONUS = 0.06;
+const EGG_CHANCE_MULT = 1.15;
+const BOSS_SCALE = 1.12;
+const LOOT_CHANCE_MULT = 1.25;
 const SAVE_DEBOUNCE_MS = 6000;
 
 function xpForLevel(level) {
@@ -2491,8 +2494,15 @@ function startFight(boss = false, auto = false, opts = {}) {
       logMessage('No boss this time—regular foes appear.');
     }
   }
-  state.currentEnemy = pickEnemy(zone, bossFight);
+  const baseEnemy = pickEnemy(zone, bossFight);
+  state.currentEnemy = { ...baseEnemy };
   const diff = opts.difficulty || 1;
+  if (bossFight) {
+    state.currentEnemy.hp = Math.round(state.currentEnemy.hp * BOSS_SCALE);
+    state.currentEnemy.attack = Math.round(state.currentEnemy.attack * BOSS_SCALE);
+    state.currentEnemy.defense = Math.round(state.currentEnemy.defense * BOSS_SCALE);
+    state.currentEnemy.xp = Math.round(state.currentEnemy.xp * BOSS_SCALE);
+  }
   state.currentEnemy.hp = Math.round(state.currentEnemy.hp * diff);
   state.currentEnemy.currentHP = state.currentEnemy.hp;
   state.currentEnemy.attack = Math.round(state.currentEnemy.attack * diff);
@@ -2728,7 +2738,7 @@ function dropLoot(boss, opts = {}) {
   const silent = opts.silent;
   const summary = opts.summary;
   const derived = applyBonuses(state.player.baseStats, state.player);
-  const baseLoot = boss ? 0.9 : 0.55;
+  const baseLoot = (boss ? 0.9 : 0.55) * LOOT_CHANCE_MULT;
   const lootChance = Math.min(0.98, baseLoot * 1.5 + (state.player.modifiers.lootBoost || 0) + (derived.lootBuff || 0));
   if (Math.random() < lootChance) {
     const item = generateItem(state.player.level, boss);
@@ -2759,7 +2769,7 @@ function dropLoot(boss, opts = {}) {
   }
   const eggChance = Math.min(
     0.95,
-    (boss ? 0.35 : 0.15) * 0.5 * (1 + (state.player.modifiers.eggBoost || 0)) + EGG_DROP_BONUS
+    ((boss ? 0.35 : 0.15) * 0.5 * (1 + (state.player.modifiers.eggBoost || 0)) + EGG_DROP_BONUS) * EGG_CHANCE_MULT
   );
   if (Math.random() < eggChance) {
     const egg = createEgg(boss);
@@ -3142,8 +3152,9 @@ function enhanceItem(itemId) {
 }
 
 function fuseItemsById(idA, idB) {
-  if (!idA || !idB || idA === idB) { logMessage('Choose two different items.'); return; }
   const inv = state.inventory.filter(i => i.type === 'gear');
+  if (inv.length < 2) { logMessage('Store at least two gear pieces in inventory to fuse.'); return; }
+  if (!idA || !idB || idA === idB) { logMessage('Choose two different items.'); return; }
   const a = inv.find(i => i.id === idA);
   const b = inv.find(i => i.id === idB);
   if (!a || !b) { logMessage('Fusion uses inventory gear only.'); return; }
@@ -3152,6 +3163,8 @@ function fuseItemsById(idA, idB) {
   if ((a.gearTier || 1) !== (b.gearTier || 1)) { logMessage('Items must share gear tier.'); return; }
   const newTier = Math.min(5, (a.gearTier || 1) + (a.rarity === b.rarity ? 1 : 0));
   const newItem = generateItem(state.player.level + newTier, false);
+  newItem.slot = a.slot;
+  newItem.name = `Fused ${a.slot.charAt(0).toUpperCase() + a.slot.slice(1)}`;
   newItem.gearTier = newTier;
   ensureItemMeta(newItem);
   state.inventory = state.inventory.filter(i => i.id !== a.id && i.id !== b.id);
@@ -3894,6 +3907,14 @@ function renderForgePanel() {
   const buildSelect = (id, list) => {
     const select = document.createElement('select');
     select.id = id;
+    if (!list.length) {
+      const opt = document.createElement('option');
+      opt.value = '';
+      opt.textContent = 'No gear available';
+      select.appendChild(opt);
+      select.disabled = true;
+      return select;
+    }
     list.forEach(item => {
       ensureItemMeta(item);
       const opt = document.createElement('option');
@@ -3923,6 +3944,7 @@ function renderForgePanel() {
   const fuseB = buildSelect('fuse-b', invGear);
   const fuseBtn = document.createElement('button');
   fuseBtn.textContent = 'Fuse';
+  fuseBtn.disabled = invGear.length < 2;
   fuseBtn.onclick = () => fuseItemsById(fuseA.value, fuseB.value);
   fusionWrap.appendChild(fuseA);
   fusionWrap.appendChild(fuseB);
