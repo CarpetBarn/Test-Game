@@ -12,6 +12,22 @@ const rarities = [
   { key: 'legendary', label: 'Legendary', color: 'legendary', weight: 0.5, stats: [4, 5], scale: 1.55 },
 ];
 
+const ELEMENTS = ['physical', 'fire', 'frost', 'nature', 'shadow', 'storm', 'earth', 'holy'];
+const elementMatrix = {
+  fire: { nature: 1.25, frost: 0.75, earth: 1.05 },
+  frost: { fire: 1.25, storm: 0.9 },
+  nature: { earth: 1.2, fire: 0.8 },
+  shadow: { holy: 0.75 },
+  holy: { shadow: 1.25, undead: 1.25 },
+  storm: { frost: 1.15 },
+  earth: { physical: 0.9, nature: 0.85 },
+};
+
+function getElementMultiplier(attacker = 'physical', defender = 'physical') {
+  const source = elementMatrix[attacker] || {};
+  return source[defender] || 1;
+}
+
 const statPool = [
   { key: 'hp', label: 'Max HP', base: 10 },
   { key: 'attack', label: 'Attack', base: 2 },
@@ -94,6 +110,21 @@ const lifeActions = {
   foraging: [{ label: 'Search for Herbs', xp: 12, sourceType: 'foraging', rewards: materialCatalog.filter(m => m.sourceType === 'foraging').map(m => ({ id: m.id, min: 1, max: 2, chance: 0.35 + m.tier * 0.08 })) }],
   fishing: [{ label: 'Go Fishing', xp: 11, sourceType: 'fishing', rewards: materialCatalog.filter(m => m.sourceType === 'fishing').map(m => ({ id: m.id, min: 1, max: 2, chance: 0.4 + m.tier * 0.05 })) }],
   hunting: [{ label: 'Dress Game', xp: 10, sourceType: 'hunting', rewards: materialCatalog.filter(m => m.sourceType === 'hunting' || m.sourceType === 'enemy').map(m => ({ id: m.id, min: 1, max: 2, chance: 0.35 + m.tier * 0.07 })) }],
+};
+
+const lifeSkillActionMap = {
+  mining: 'MINE',
+  foraging: 'FORAGE',
+  fishing: 'FISH',
+  hunting: 'HUNT_JOB',
+  blacksmithing: 'SMITH',
+  alchemy: 'BREW',
+  cooking: 'COOK',
+  enchanting: 'ENCHANT',
+  refining: 'REFINE',
+  dragonHandling: 'HANDLE',
+  dragonBonding: 'BOND',
+  trading: 'TRADE',
 };
 
 // =================== BLACKSMITHING RECIPES ===================
@@ -864,6 +895,7 @@ const zones = [
     level: 1,
     recommendedLevel: 1,
     allowedMaterialTiers: [1],
+    element: 'nature',
     enemies: [
       { name: 'Wildling', tag: 'humanoid', hp: 55, attack: 8, defense: 2, xp: 14, gold: 8 },
       { name: 'Forest Wolf', tag: 'beast', hp: 50, attack: 9, defense: 2, xp: 12, gold: 7 },
@@ -876,6 +908,7 @@ const zones = [
     level: 5,
     recommendedLevel: 5,
     allowedMaterialTiers: [1, 2],
+    element: 'frost',
     enemies: [
       { name: 'Frost Imp', tag: 'elemental', hp: 85, attack: 13, defense: 6, xp: 22, gold: 13 },
       { name: 'Bandit Scout', tag: 'humanoid', hp: 75, attack: 15, defense: 4, xp: 20, gold: 12 },
@@ -888,6 +921,7 @@ const zones = [
     level: 10,
     recommendedLevel: 10,
     allowedMaterialTiers: [2],
+    element: 'fire',
     enemies: [
       { name: 'Cinder Whelp', tag: 'dragon', hp: 110, attack: 17, defense: 8, xp: 34, gold: 20 },
       { name: 'Ash Stalker', tag: 'beast', hp: 105, attack: 18, defense: 7, xp: 32, gold: 19 },
@@ -900,6 +934,7 @@ const zones = [
     level: 15,
     recommendedLevel: 15,
     allowedMaterialTiers: [2, 3],
+    element: 'earth',
     enemies: [
       { name: 'Steel Golem', tag: 'construct', hp: 150, attack: 21, defense: 11, xp: 48, gold: 28 },
       { name: 'Rogue Knight', tag: 'humanoid', hp: 145, attack: 22, defense: 10, xp: 46, gold: 27 },
@@ -912,6 +947,7 @@ const zones = [
     level: 22,
     recommendedLevel: 22,
     allowedMaterialTiers: [3, 4],
+    element: 'storm',
     enemies: [
       { name: 'Sky Raider', tag: 'humanoid', hp: 175, attack: 24, defense: 12, xp: 60, gold: 32 },
       { name: 'Storm Drake', tag: 'dragon', hp: 185, attack: 25, defense: 12, xp: 64, gold: 34 },
@@ -924,6 +960,7 @@ const zones = [
     level: 30,
     recommendedLevel: 30,
     allowedMaterialTiers: [4, 5],
+    element: 'shadow',
     enemies: [
       { name: 'Shadowstalker', tag: 'undead', hp: 205, attack: 27, defense: 13, xp: 78, gold: 40 },
       { name: 'Night Wraith', tag: 'undead', hp: 215, attack: 28, defense: 14, xp: 82, gold: 42 },
@@ -936,6 +973,7 @@ const zones = [
     level: 40,
     recommendedLevel: 40,
     allowedMaterialTiers: [5],
+    element: 'shadow',
     enemies: [
       { name: 'Rotfiend', tag: 'undead', hp: 235, attack: 30, defense: 15, xp: 96, gold: 48 },
       { name: 'Bone Colossus', tag: 'undead', hp: 260, attack: 32, defense: 16, xp: 110, gold: 52 },
@@ -949,6 +987,16 @@ const ACTIONS = {
   CHOP: { id: 'CHOP', label: 'Chop Wood', baseCooldownMs: 120 * 1000 },
   MINE: { id: 'MINE', label: 'Mine Ore', baseCooldownMs: 120 * 1000 },
   FISH: { id: 'FISH', label: 'Fish', baseCooldownMs: 120 * 1000 },
+  FORAGE: { id: 'FORAGE', label: 'Forage', baseCooldownMs: 120 * 1000 },
+  HUNT_JOB: { id: 'HUNT_JOB', label: 'Hunt Materials', baseCooldownMs: 120 * 1000 },
+  COOK: { id: 'COOK', label: 'Cook', baseCooldownMs: 5 * 60 * 1000 },
+  BREW: { id: 'BREW', label: 'Brew', baseCooldownMs: 5 * 60 * 1000 },
+  ENCHANT: { id: 'ENCHANT', label: 'Enchant', baseCooldownMs: 10 * 60 * 1000 },
+  REFINE: { id: 'REFINE', label: 'Refine', baseCooldownMs: 5 * 60 * 1000 },
+  SMITH: { id: 'SMITH', label: 'Forge', baseCooldownMs: 5 * 60 * 1000 },
+  HANDLE: { id: 'HANDLE', label: 'Handle Dragon', baseCooldownMs: 6 * 60 * 1000 },
+  BOND: { id: 'BOND', label: 'Bond Dragon', baseCooldownMs: 6 * 60 * 1000 },
+  TRADE: { id: 'TRADE', label: 'Trade', baseCooldownMs: 4 * 60 * 1000 },
   FIGHT: { id: 'FIGHT', label: 'Fight', baseCooldownMs: 30 * 1000 },
   AUTO_BATTLE: { id: 'AUTO_BATTLE', label: 'Auto Battle', baseCooldownMs: 30 * 1000 },
   ADVENTURE: { id: 'ADVENTURE', label: 'Adventure', baseCooldownMs: 10 * 60 * 1000 },
@@ -1225,6 +1273,7 @@ const state = {
   player: null,
   inventory: [],
   eggs: [],
+  dragons: [],
   activeDragon: null,
   currentZone: 0,
   unlockedZones: 1,
@@ -1470,7 +1519,9 @@ function generateItem(level, isBoss = false) {
     stats.push(rollStat(pick, level, rarity));
   }
   const name = `${rarity.label} ${slot.charAt(0).toUpperCase() + slot.slice(1)}`;
-  return { id: crypto.randomUUID(), type: 'gear', name, slot, rarity: rarity.key, stats, levelReq: Math.max(1, Math.floor(level * 0.8)), power: stats.reduce((t, s) => t + s.value, 0), sockets: socketsFromRarity(rarity.key), gems: [] };
+  const zoneElem = zones[state.currentZone]?.element || 'physical';
+  const gearTier = Math.max(1, Math.min(5, Math.ceil(level / 10)));
+  return { id: crypto.randomUUID(), type: 'gear', name, slot, rarity: rarity.key, stats, levelReq: Math.max(1, Math.floor(level * 0.8)), power: stats.reduce((t, s) => t + s.value, 0), sockets: socketsFromRarity(rarity.key), gems: [], gearTier, enhancementLevel: 0, maxEnhancementLevel: 10, element: zoneElem };
 }
 
 function rerollGear(item) {
@@ -1494,19 +1545,40 @@ function aggregateSockets(item) {
   return bonus;
 }
 
+function ensureItemMeta(item) {
+  if (!item) return item;
+  if (item.enhancementLevel === undefined) item.enhancementLevel = 0;
+  if (!item.maxEnhancementLevel) item.maxEnhancementLevel = 10;
+  if (!item.gearTier) item.gearTier = Math.max(1, Math.min(5, Math.ceil((item.levelReq || 1) / 10)));
+  if (!item.element) item.element = 'physical';
+  if (!item.gems) item.gems = [];
+  return item;
+}
+
+function getEnhancementMultiplier(item) {
+  const lvl = item?.enhancementLevel || 0;
+  return 1 + lvl * 0.05;
+}
+
 function applyBonuses(baseStats, player) {
   const prestigeBonus = 1 + (state.prestige || 0) * 0.03;
   const gearStats = { hp: 0, attack: 0, defense: 0, crit: 0, critdmg: 0, speed: 0, elemental: 0 };
   const gemFlat = { attackPct: 0, defensePct: 0, hpPct: 0, loot: 0, lifesteal: 0 };
+  let element = 'physical';
   Object.values(player.equipment).forEach(item => {
     if (!item) return;
-    item.stats.forEach(s => { gearStats[s.key] = (gearStats[s.key] || 0) + s.value; });
+    ensureItemMeta(item);
+    const mult = getEnhancementMultiplier(item);
+    if (item.element && element === 'physical') element = item.element;
+    item.stats.forEach(s => { gearStats[s.key] = (gearStats[s.key] || 0) + Math.round(s.value * mult); });
     const socketStats = aggregateSockets(item);
     ['hp', 'attack', 'defense', 'crit', 'critdmg', 'speed', 'elemental'].forEach(k => { gearStats[k] = (gearStats[k] || 0) + (socketStats[k] || 0); });
     Object.keys(gemFlat).forEach(k => { gemFlat[k] = (gemFlat[k] || 0) + (socketStats[k] || 0); });
   });
   const dragonFactor = 1 + (player.modifiers.dragonBond || 0) + ((state.lifeSkills.dragonBonding ? state.lifeSkills.dragonBonding.level : 0) * 0.01);
   const dragonStats = state.activeDragon ? Object.fromEntries(Object.entries(state.activeDragon.bonus).map(([k, v]) => [k, Math.round(v * dragonFactor)])) : {};
+  if (element === 'physical' && state.activeDragon?.element) element = state.activeDragon.element;
+  if (element === 'physical' && zones[state.currentZone]?.element) element = zones[state.currentZone].element;
   const food = state.foodBuff && state.foodBuff.battles > 0 ? state.foodBuff : null;
   const foodAtk = food && food.attack ? food.attack : 0;
   const foodHp = food && food.hp ? food.hp : 0;
@@ -1522,6 +1594,7 @@ function applyBonuses(baseStats, player) {
     critdmg: 1.5 + (gearStats.critdmg || 0) / 100 + player.modifiers.critdmg + (dragonStats.critdmg || 0),
     speed: (baseStats.speed || 0) + (gearStats.speed || 0) + (player.flat.speed || 0) + (dragonStats.speed || 0) + foodSpeed,
     elemental: (gearStats.elemental || 0) + (dragonStats.elemental || 0),
+    element: element || 'physical',
     lootBuff: foodLoot + (gemFlat.loot || 0),
     lifesteal: gemFlat.lifesteal || 0,
   };
@@ -1531,7 +1604,7 @@ function pickEnemy(zone, boss = false) {
   const choice = boss ? zone.boss : zone.enemies[Math.floor(Math.random() * zone.enemies.length)];
   const scaledHP = Math.round(choice.hp * ENEMY_SCALE);
   const scaledAttack = Math.round(choice.attack * ENEMY_SCALE * ENEMY_ATTACK_MOD);
-  return { ...choice, hp: scaledHP, attack: scaledAttack, currentHP: scaledHP };
+  return { ...choice, hp: scaledHP, attack: scaledAttack, currentHP: scaledHP, element: choice.element || zone.element || 'physical' };
 }
 
 function performEpicAction(actionId) {
@@ -1997,6 +2070,7 @@ const CombatSystem = {
       crit: 5,
       critdmg: 1.5,
       speed: enemy.speed || 10,
+      element: enemy.element || this.battle.zone?.element || 'physical',
     };
     if (this.battle.zoneMod?.enemySpeed) base.speed += this.battle.zoneMod.enemySpeed;
     if (this.battle.zoneMod?.enemyAttackMod) base.attack = Math.round(base.attack * (1 + this.battle.zoneMod.enemyAttackMod));
@@ -2015,6 +2089,8 @@ const CombatSystem = {
     let critChance = attacker.crit + (opts.critBonus ? opts.critBonus * 100 : 0);
     const crit = Math.random() * 100 < critChance;
     if (crit) damage = Math.round(damage * attacker.critdmg);
+    const elementMult = getElementMultiplier(attacker.element || 'physical', defender.element || 'physical');
+    damage = Math.round(damage * elementMult);
     if (state.activeDragon && Math.random() < 0.15) {
       const bonusDmg = Math.max(1, Math.round(attacker.attack * 0.2));
       damage += bonusDmg;
@@ -2303,7 +2379,9 @@ function createEgg(boss) {
   const reduction = state.player ? (state.player.modifiers.eggBoost || 0) : 0;
   const bonus = rollDragonBonus(rar);
   const requirement = Math.max(1, Math.round((3 + Math.floor(Math.random() * 3)) * (1 - reduction)));
-  return { id: crypto.randomUUID(), rarity: rar.key, progress: 0, requirement, hatched: false, bonus };
+  const element = zones[state.currentZone]?.element || ELEMENTS[Math.floor(Math.random() * ELEMENTS.length)];
+  const traits = [element];
+  return { id: crypto.randomUUID(), rarity: rar.key, progress: 0, requirement, hatched: false, bonus, element, traits };
 }
 
 function createPotion(level) {
@@ -2343,7 +2421,10 @@ function hatchProgress() {
       egg.progress += bonus;
       if (egg.progress >= egg.requirement) {
         egg.hatched = true;
-        egg.dragon = { name: `${egg.rarity} Dragonling`, rarity: egg.rarity, bonus: egg.bonus };
+        const element = egg.element || zones[state.currentZone]?.element || 'physical';
+        const dragon = { id: crypto.randomUUID(), name: `${egg.rarity} Dragonling`, rarity: egg.rarity, bonus: egg.bonus, element, traits: egg.traits || [], nextBreedAvailableAt: 0 };
+        egg.dragon = dragon;
+        state.dragons.push(dragon);
         logMessage(`${egg.dragon.name} has hatched!`);
         if (!state.activeDragon) state.activeDragon = egg.dragon;
         gainLifeSkillXP('dragonHandling', 10);
@@ -2472,6 +2553,9 @@ function addMaterial(id, qty) {
 }
 
 function performLifeAction(skillId, action) {
+  const actionKey = lifeSkillActionMap[skillId];
+  if (actionKey && !isActionReady(actionKey)) { logMessage('Action is on cooldown.'); return; }
+  if (actionKey) startActionCooldown(actionKey);
   const skill = state.lifeSkills[skillId];
   const levelBonus = 1 + skill.level * 0.02;
   let gained = [];
@@ -2500,6 +2584,8 @@ function performLifeAction(skillId, action) {
 }
 
 function craftRecipe(skillId, recipe) {
+  const actionKey = lifeSkillActionMap[skillId];
+  if (actionKey && !isActionReady(actionKey)) { logMessage('Action is on cooldown.'); return; }
   const skill = state.lifeSkills[skillId];
   const playerLevelGate = recipe.playerLevelReq || requiredPlayerLevelForTier(recipe.tier || recipe.gearTier || 1);
   if (state.player.level < playerLevelGate) { logMessage(`Requires level ${playerLevelGate} to craft.`); return; }
@@ -2507,6 +2593,7 @@ function craftRecipe(skillId, recipe) {
   if (!state.recipeUnlocks[recipe.id]) { logMessage('Recipe not learned yet.'); return; }
   const missing = Object.entries(recipe.mats).find(([m, qty]) => (state.materials[m] || 0) < qty);
   if (missing) { logMessage(`Need more ${missing[0]}.`); return; }
+  if (actionKey) startActionCooldown(actionKey);
   Object.entries(recipe.mats).forEach(([m, qty]) => { state.materials[m] -= qty; });
   gainLifeSkillXP(skillId, 18 + recipe.skillReq * 2);
   if (recipe.type === 'refine') {
@@ -2520,7 +2607,7 @@ function craftRecipe(skillId, recipe) {
     const quality = rollQuality(skill);
     const stats = recipe.stats.map(s => ({ ...s, value: Math.max(1, Math.round(s.value * (1 + quality.boost))) }));
     const socketBonus = getPerkBonus('blacksmithing', skill.level, 35) ? 1 : 0;
-    const item = { id: crypto.randomUUID(), type: 'gear', name: `${quality.label} ${recipe.name}`, slot: recipe.slot, rarity: recipe.rarity, stats, levelReq: recipe.levelReq, power: stats.reduce((t, s) => t + s.value, 0), quality: quality.key, sockets: (recipe.sockets || 0) + socketBonus, gems: [] };
+    const item = { id: crypto.randomUUID(), type: 'gear', name: `${quality.label} ${recipe.name}`, slot: recipe.slot, rarity: recipe.rarity, stats, levelReq: recipe.levelReq, power: stats.reduce((t, s) => t + s.value, 0), quality: quality.key, sockets: (recipe.sockets || 0) + socketBonus, gems: [], gearTier: recipe.gearTier || recipe.tier || 1, enhancementLevel: 0, maxEnhancementLevel: 10, element: recipe.element || zones[state.currentZone]?.element || 'physical' };
     if (!item.sockets) item.sockets = socketsFromRarity(item.rarity);
     if (quality.affix) item.affix = 'Bonus affix';
     state.inventory.push(item);
@@ -2576,6 +2663,51 @@ function socketsFromRarity(rarity) {
     case 'legendary': return 3;
     default: return 0;
   }
+}
+
+const upgradeMats = { 1: 'copper_ore', 2: 'iron_ore', 3: 'steel_ore', 4: 'mithril_ore', 5: 'dragonite_ore' };
+
+function enhancementRequirement(item) {
+  const tier = item.gearTier || 1;
+  const mat = upgradeMats[tier] || 'copper_ore';
+  const qty = Math.max(1, item.enhancementLevel + 1);
+  const gold = 30 * (item.enhancementLevel + 1);
+  return { mat, qty, gold };
+}
+
+function enhanceItem(itemId) {
+  const items = [...state.inventory, ...Object.values(state.player.equipment || {})].filter(Boolean);
+  const item = items.find(i => i.id === itemId);
+  if (!item) { logMessage('Select gear to enhance.'); return; }
+  ensureItemMeta(item);
+  if (item.enhancementLevel >= item.maxEnhancementLevel) { logMessage('Item is at maximum enhancement.'); return; }
+  const req = enhancementRequirement(item);
+  if ((state.materials[req.mat] || 0) < req.qty) { logMessage(`Need ${req.qty} ${req.mat}.`); return; }
+  if (state.player.gold < req.gold) { logMessage('Not enough gold.'); return; }
+  state.materials[req.mat] -= req.qty;
+  state.player.gold -= req.gold;
+  item.enhancementLevel += 1;
+  logMessage(`Enhanced ${item.name} to +${item.enhancementLevel}.`);
+  updateAll();
+}
+
+function fuseItemsById(idA, idB) {
+  if (!idA || !idB || idA === idB) { logMessage('Choose two different items.'); return; }
+  const inv = state.inventory.filter(i => i.type === 'gear');
+  const a = inv.find(i => i.id === idA);
+  const b = inv.find(i => i.id === idB);
+  if (!a || !b) { logMessage('Fusion uses inventory gear only.'); return; }
+  ensureItemMeta(a); ensureItemMeta(b);
+  if (a.slot !== b.slot) { logMessage('Items must be same slot.'); return; }
+  if ((a.gearTier || 1) !== (b.gearTier || 1)) { logMessage('Items must share gear tier.'); return; }
+  const newTier = Math.min(5, (a.gearTier || 1) + (a.rarity === b.rarity ? 1 : 0));
+  const newItem = generateItem(state.player.level + newTier, false);
+  newItem.gearTier = newTier;
+  ensureItemMeta(newItem);
+  state.inventory = state.inventory.filter(i => i.id !== a.id && i.id !== b.id);
+  state.inventory.push(newItem);
+  logMessage(`Fusion created ${newItem.name} (Tier ${newTier}).`);
+  updateAll();
 }
 
 function requiredPlayerLevelForTier(tier) {
@@ -3025,7 +3157,9 @@ function renderEquipment() {
     const item = state.player.equipment[slot];
     const div = document.createElement('div');
     div.className = `slot ${item ? 'rarity-' + item.rarity : ''}`;
-    div.innerHTML = `<strong>${slot.toUpperCase()}</strong><br>${item ? `<span class="name ${item.rarity}">${item.name}</span>` : '<span class="small">Empty</span>'}`;
+    const enh = item && item.enhancementLevel ? `+${item.enhancementLevel} ` : '';
+    const element = item?.element ? `<span class="tiny muted">${item.element}</span>` : '';
+    div.innerHTML = `<strong>${slot.toUpperCase()}</strong><br>${item ? `<span class="name ${item.rarity}">${enh}${item.name}</span>${element}` : '<span class="small">Empty</span>'}`;
     if (item) {
       const stats = item.stats.map(s => `<div class="small">+${s.value} ${s.label}</div>`).join('');
       const info = document.createElement('div');
@@ -3104,7 +3238,9 @@ function renderInventory() {
     } else {
       const better = isBetterThanEquipped(item);
       const arrow = better ? '<span class="better-arrow">↑</span>' : '';
-      card.innerHTML = `<div class="name ${item.rarity}">${item.name}${arrow}</div><div class="small">Requires Lv ${item.levelReq} • Slot: ${item.slot}</div><div class="small">Power ${item.power}</div>`;
+      const enh = item.enhancementLevel ? `+${item.enhancementLevel} ` : '';
+      const element = item.element ? `<span class="tiny muted">${item.element}</span>` : '';
+      card.innerHTML = `<div class="name ${item.rarity}">${enh}${item.name}${arrow}</div><div class="small">Requires Lv ${item.levelReq} • Slot: ${item.slot}</div><div class="small">Power ${item.power}</div>${element}`;
       (item.stats || []).forEach(s => {
         const stat = document.createElement('div');
         stat.className = 'small';
@@ -3124,6 +3260,50 @@ function renderInventory() {
     }
     wrap.appendChild(card);
   });
+}
+
+function renderForgePanel() {
+  const enhanceWrap = document.getElementById('enhance-panel');
+  const fusionWrap = document.getElementById('fusion-panel');
+  if (!enhanceWrap || !fusionWrap) return;
+  const gear = [...Object.values(state.player.equipment || {}), ...state.inventory.filter(i => i.type === 'gear')].filter(Boolean);
+  const invGear = state.inventory.filter(i => i.type === 'gear');
+  const buildSelect = (id, list) => {
+    const select = document.createElement('select');
+    select.id = id;
+    list.forEach(item => {
+      ensureItemMeta(item);
+      const opt = document.createElement('option');
+      opt.value = item.id;
+      opt.textContent = `${item.slot} • ${item.name} (+${item.enhancementLevel || 0})`;
+      select.appendChild(opt);
+    });
+    return select;
+  };
+  enhanceWrap.innerHTML = '';
+  const selectEnh = buildSelect('enhance-select', gear);
+  const enhanceBtn = document.createElement('button');
+  enhanceBtn.textContent = 'Enhance';
+  enhanceBtn.onclick = () => enhanceItem(selectEnh.value);
+  const reqInfo = document.createElement('div');
+  reqInfo.className = 'tiny muted';
+  if (gear.length) {
+    const req = enhancementRequirement(gear[0]);
+    reqInfo.textContent = `Costs ${req.qty} ${req.mat} + ${req.gold} gold for next level.`;
+  }
+  enhanceWrap.appendChild(selectEnh);
+  enhanceWrap.appendChild(enhanceBtn);
+  enhanceWrap.appendChild(reqInfo);
+
+  fusionWrap.innerHTML = '';
+  const fuseA = buildSelect('fuse-a', invGear);
+  const fuseB = buildSelect('fuse-b', invGear);
+  const fuseBtn = document.createElement('button');
+  fuseBtn.textContent = 'Fuse';
+  fuseBtn.onclick = () => fuseItemsById(fuseA.value, fuseB.value);
+  fusionWrap.appendChild(fuseA);
+  fusionWrap.appendChild(fuseB);
+  fusionWrap.appendChild(fuseBtn);
 }
 
 function renderSocketPanel() {
@@ -3283,6 +3463,8 @@ function renderDragonTab() {
   const eggWrap = document.getElementById('egg-list');
   eggWrap.innerHTML = '';
   if (!state.eggs.length) eggWrap.innerHTML = '<div class="small">No eggs yet.</div>';
+  state.eggs.filter(e => e.hatched && e.dragon && !state.dragons.find(d => d.id === e.dragon.id)).forEach(e => state.dragons.push(e.dragon));
+  if (state.activeDragon && !state.dragons.find(d => d.id === state.activeDragon.id)) state.dragons.push(state.activeDragon);
   state.eggs.forEach(egg => {
     const card = document.createElement('div');
     card.className = `egg rarity-${egg.rarity}`;
@@ -3303,12 +3485,13 @@ function renderDragonTab() {
   const active = document.getElementById('active-dragon');
   if (state.activeDragon) {
     const d = state.activeDragon;
-    active.innerHTML = `<div class="dragon-card rarity-${d.rarity}"><div class="name ${d.rarity}">${d.name}</div>` +
+    active.innerHTML = `<div class="dragon-card rarity-${d.rarity}"><div class="name ${d.rarity}">${d.name}</div><div class="tiny muted">${d.element || 'physical'}</div>` +
       Object.entries(d.bonus).map(([k,v]) => `<div class="small">+${v} ${k}</div>`).join('') + '</div>';
   } else {
     active.innerHTML = '<div class="small">No active dragon.</div>';
   }
   renderCombineArea();
+  renderBreedingPanel();
 }
 
 function valueFromEgg(egg) {
@@ -3354,6 +3537,63 @@ function combineEggs(rarityKey) {
   newEgg.requirement = Math.max(1, newEgg.requirement - 1);
   state.eggs.push(newEgg);
   logMessage('The eggs resonate and form a stronger one!');
+  updateAll();
+}
+
+function renderBreedingPanel() {
+  const panel = document.getElementById('breeding-panel');
+  if (!panel) return;
+  const dragons = state.dragons || [];
+  if (!dragons.length) { panel.innerHTML = '<div class="small">Hatch dragons to begin breeding.</div>'; return; }
+  const now = Date.now();
+  const buildSelect = (id) => {
+    const select = document.createElement('select');
+    select.id = id;
+    dragons.forEach(d => {
+      const readyIn = Math.max(0, (d.nextBreedAvailableAt || 0) - now);
+      const opt = document.createElement('option');
+      opt.value = d.id;
+      opt.textContent = `${d.name} (${d.rarity}, ${d.element || 'physical'}) ${readyIn ? '• ' + formatCooldown(readyIn) : ''}`;
+      select.appendChild(opt);
+    });
+    return select;
+  };
+  panel.innerHTML = '<h5>Breed Dragons</h5><div class="tiny muted">Pair two dragons to create a new egg.</div>';
+  const row = document.createElement('div');
+  row.className = 'breeding-row';
+  const selectA = buildSelect('breed-a');
+  const selectB = buildSelect('breed-b');
+  row.appendChild(selectA);
+  row.appendChild(selectB);
+  const btn = document.createElement('button');
+  btn.textContent = 'Breed';
+  btn.onclick = () => breedDragons(selectA.value, selectB.value);
+  panel.appendChild(row);
+  panel.appendChild(btn);
+}
+
+function breedDragons(aId, bId) {
+  if (!aId || !bId || aId === bId) { logMessage('Pick two different dragons.'); return; }
+  const a = (state.dragons || []).find(d => d.id === aId);
+  const b = (state.dragons || []).find(d => d.id === bId);
+  if (!a || !b) { logMessage('Missing dragons.'); return; }
+  const now = Date.now();
+  if ((a.nextBreedAvailableAt || 0) > now || (b.nextBreedAvailableAt || 0) > now) { logMessage('One parent is still resting.'); return; }
+  const cost = 50;
+  if (state.player.gold < cost) { logMessage('Not enough gold to breed.'); return; }
+  state.player.gold -= cost;
+  const rarA = rarities.findIndex(r => r.key === a.rarity);
+  const rarB = rarities.findIndex(r => r.key === b.rarity);
+  const baseRarity = Math.max(rarA, rarB);
+  const rarityIndex = Math.min(rarities.length - 1, baseRarity + (Math.random() < 0.25 ? 1 : 0));
+  const element = Math.random() < 0.5 ? a.element : b.element;
+  const rar = rarities[rarityIndex];
+  const egg = { id: crypto.randomUUID(), rarity: rar.key, progress: 0, requirement: 4 + Math.floor(Math.random() * 3), hatched: false, bonus: rollDragonBonus(rar), element, traits: [element], parentIds: [a.id, b.id] };
+  state.eggs.push(egg);
+  const cooldownMs = (4 + baseRarity) * 60 * 60 * 1000;
+  a.nextBreedAvailableAt = now + cooldownMs;
+  b.nextBreedAvailableAt = now + cooldownMs;
+  logMessage(`Dragons breed and produce a ${egg.rarity} ${element} egg.`);
   updateAll();
 }
 
@@ -3442,12 +3682,15 @@ function renderLifeActions() {
   title.textContent = `${lifeSkillDefs[id].name} Actions`;
   if (meta) meta.textContent = `Level ${skill.level} • ${skill.currentXP}/${skill.xpToNext} XP`;
   const actionLabels = {
-    mining: 'Mine', foraging: 'Forage', fishing: 'Fish', hunting: 'Hunt',
+    mining: 'Mine', foraging: 'Forage', fishing: 'Fish', hunting: 'Hunt', refining: 'Refine',
     blacksmithing: 'Craft Item', alchemy: 'Brew Potion', cooking: 'Cook Meal', enchanting: 'Apply Enchant',
     dragonHandling: 'Handle Dragon', dragonBonding: 'Bond Dragon', trading: 'Trade',
   };
   if (primary) {
-    primary.textContent = actionLabels[id] || 'Perform';
+    const actionKey = lifeSkillActionMap[id];
+    const cd = actionKey ? getActionCooldownState(actionKey) : { ready: true, remaining: 0 };
+    const label = actionLabels[id] || 'Perform';
+    primary.textContent = cd.ready ? label : `${label} (${formatCooldown(cd.remaining)})`;
     const actions = lifeActions[id] || [];
     primary.onclick = () => {
       if (actions.length) {
@@ -3460,7 +3703,7 @@ function renderLifeActions() {
         }
       }
     };
-    primary.disabled = !(lifeActions[id] && lifeActions[id].length) && !(recipeBook[id] && recipeBook[id].length);
+    primary.disabled = ((!(lifeActions[id] && lifeActions[id].length) && !(recipeBook[id] && recipeBook[id].length)) || !cd.ready);
   }
   const actions = lifeActions[id] || [];
   if (!actions.length) { actionsWrap.innerHTML = '<div class="small">No active buttons here. Practice via crafting or battle hooks.</div>'; }
@@ -3613,6 +3856,7 @@ function updateAll() {
   renderEquipment();
   renderInventory();
   renderSocketPanel();
+  renderForgePanel();
   renderDragonTab();
   renderSkills();
   renderLifeSkillsTab();
@@ -3632,6 +3876,7 @@ function prestige() {
   state.player = createPlayer(cls);
   state.inventory = [];
   state.eggs = [];
+  state.dragons = [];
   state.activeDragon = null;
   state.unlockedZones = 1;
   state.currentZone = 0;
@@ -3649,6 +3894,7 @@ function resetGame() {
   state.player = null;
   state.inventory = [];
   state.eggs = [];
+  state.dragons = [];
   state.activeDragon = null;
   state.currentZone = 0;
   state.unlockedZones = 1;
@@ -3675,6 +3921,7 @@ function saveGame() {
     player: state.player,
     inventory: state.inventory,
     eggs: state.eggs,
+    dragons: state.dragons,
     activeDragon: state.activeDragon,
     currentZone: state.currentZone,
     unlockedZones: state.unlockedZones,
@@ -3703,10 +3950,11 @@ function loadGame() {
     const parsed = JSON.parse(data);
     state.player = parsed.player;
     ensureModifierDefaults(state.player);
-    Object.values(state.player.equipment || {}).forEach(it => { if (it && !it.gems) it.gems = []; });
+    Object.values(state.player.equipment || {}).forEach(it => { if (it) { ensureItemMeta(it); } });
     state.inventory = parsed.inventory || [];
-    state.inventory.forEach(it => { if (!it.type) it.type = 'gear'; if (!it.gems) it.gems = []; });
+    state.inventory.forEach(it => { if (!it.type) it.type = 'gear'; ensureItemMeta(it); });
     state.eggs = parsed.eggs || [];
+    state.dragons = parsed.dragons || [];
     state.activeDragon = parsed.activeDragon || null;
     state.currentZone = parsed.currentZone || 0;
     state.unlockedZones = parsed.unlockedZones || 1;

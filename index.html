@@ -149,12 +149,13 @@
                   <p class="muted">Manage equipment, dragons, skills, and more.</p>
                 </div>
               </div>
-              <div class="tabs">
-                <button data-tab="equipment" class="active">Equipment</button>
-                <button data-tab="inventory">Inventory</button>
-                <button data-tab="dragons">Dragons</button>
-                <button data-tab="skills">Skill Tree</button>
-                <button data-tab="life">Life Skills</button>
+                <div class="tabs">
+                  <button data-tab="equipment" class="active">Equipment</button>
+                  <button data-tab="inventory">Inventory</button>
+                  <button data-tab="forge">Forge</button>
+                  <button data-tab="dragons">Dragons</button>
+                  <button data-tab="skills">Skill Tree</button>
+                  <button data-tab="life">Life Skills</button>
                 <button data-tab="shop">Shop</button>
                 <button data-tab="epic-systems">EPIC Systems</button>
               </div>
@@ -168,6 +169,18 @@
                     <div>
                       <h4 class="muted">Sockets &amp; Augments</h4>
                       <div id="socket-panel"></div>
+                    </div>
+                  </div>
+                </div>
+                <div id="forge" class="tab">
+                  <div class="panel-split">
+                    <div>
+                      <h4 class="muted">Enhance Gear</h4>
+                      <div id="enhance-panel"></div>
+                    </div>
+                    <div>
+                      <h4 class="muted">Fuse Gear</h4>
+                      <div id="fusion-panel"></div>
                     </div>
                   </div>
                 </div>
@@ -212,6 +225,7 @@
                       <h4 class="muted">Egg Incubation</h4>
                       <div id="egg-list"></div>
                       <div id="combine-area"></div>
+                      <div id="breeding-panel"></div>
                     </div>
                     <div>
                       <h4 class="muted">Active Companion</h4>
