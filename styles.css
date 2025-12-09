@@ -184,11 +184,20 @@ body.animations-off *::after {
 
 .panel-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
 .panel-header h3 { margin: 0; }
+.zone-travel-status { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
 
 .badge { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.06); color: var(--color-text); font-size: 0.85rem; border: 1px solid var(--color-border); }
 .badge.tier { background: rgba(79, 140, 255, 0.12); border-color: var(--color-accent); font-weight: 700; }
 
-.zone-grid { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+.zone-card-list { display: flex; gap: 10px; flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; }
+.zone-card { background: var(--color-panel-strong); border-radius: var(--radius-lg); border: 1px solid var(--color-border); padding: 10px 14px; min-width: 150px; text-align: left; cursor: pointer; transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease; color: var(--color-text); }
+.zone-card:hover:not(.zone-card--locked):not(.zone-card--active) { border-color: rgba(96, 165, 250, 0.7); transform: translateY(-1px); }
+.zone-card--active { border-color: var(--color-accent); background: rgba(15, 23, 42, 0.95); }
+.zone-card--locked { opacity: 0.55; cursor: not-allowed; }
+.zone-card .zone-name { font-weight: 700; }
+.zone-card .zone-level { color: var(--color-muted); font-size: 0.85rem; }
+.zone-card .zone-mats { font-size: 0.75rem; color: var(--color-muted); }
+.zone-card .zone-locked-label { font-size: 0.75rem; color: #f87171; margin-top: 6px; }
 .epic-action-wrap { margin-top: 12px; padding: 12px; background: var(--color-bg-elevated); border-radius: var(--radius-lg); box-shadow: var(--shadow-soft); }
 .panel-subhead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; gap: 8px; }
 .epic-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
@@ -251,7 +260,7 @@ body.animations-off *::after {
   .view-section { padding: 12px; }
   .bar-stack { grid-template-columns: 1fr; }
   .panel-header { flex-direction: column; align-items: flex-start; }
-  .zone-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+  .zone-card-list { gap: 8px; }
   .epic-actions { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
   .tabs { grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); }
 }

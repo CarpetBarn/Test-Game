@@ -1133,7 +1133,7 @@ const ACTIONS = {
   BOSS: { id: 'BOSS', label: 'Boss', baseCooldownMs: 4 * 60 * 60 * 1000 },
   WORLD_BOSS: { id: 'WORLD_BOSS', label: 'World Boss', baseCooldownMs: 24 * 60 * 60 * 1000 },
   TOWER: { id: 'TOWER', label: 'Tower Run', baseCooldownMs: 30 * 60 * 1000 },
-  TRAVEL: { id: 'TRAVEL', label: 'Travel', baseCooldownMs: 45 * 1000 },
+  TRAVEL_ZONE: { id: 'TRAVEL_ZONE', label: 'Travel Zone', baseCooldownMs: 20 * 60 * 1000 },
 };
 
 const epicActions = [
@@ -1539,6 +1539,14 @@ function ensureMetaSystems() {
   if (!state.shopRefresh) state.shopRefresh = 0;
 }
 
+function isZoneUnlocked(zoneIndex, player = state.player) {
+  const zone = zones[zoneIndex];
+  if (!zone || !player) return false;
+  const requiredLevel = zone.requiredLevel || zone.level || zone.recommendedLevel || 1;
+  if (player.level < requiredLevel) return false;
+  return zoneIndex < state.unlockedZones;
+}
+
 function getActionCooldownMs(actionId) {
   const key = actionId.toUpperCase();
   const config = ACTIONS[key];
@@ -1737,7 +1745,7 @@ function performEpicAction(actionId) {
   if (!action) return;
   const cd = getActionCooldownState(action.cooldownId || actionId);
   if (!cd.ready) { logMessage('Action is on cooldown.'); return; }
-  if (state.currentZone >= state.unlockedZones) { logMessage('Unlock the zone boss first.'); return; }
+  if (!isZoneUnlocked(state.currentZone)) { logMessage('Unlock the zone boss first.'); return; }
   const zone = zones[state.currentZone];
   if (!zone) { logMessage('Choose a zone to act in.'); return; }
   if (action.type === 'combat') {
@@ -2388,7 +2396,7 @@ function autoBattle() {
   const cdState = getActionCooldownState('AUTO_BATTLE');
   if (!cdState.ready) { logMessage(`Auto battle ready in ${formatCooldown(cdState.remaining)}.`); return; }
   if (CombatSystem.active) { logMessage('Finish the current battle before auto battling.'); return; }
-  if (state.currentZone >= state.unlockedZones) { logMessage('Defeat the zone boss to progress before auto battling.'); return; }
+  if (!isZoneUnlocked(state.currentZone)) { logMessage('Defeat the zone boss to progress before auto battling.'); return; }
   const zone = zones[state.currentZone];
   let count = parseInt(document.getElementById('auto-count').value, 10);
   if (Number.isNaN(count) || count < 1) count = 1;
@@ -3262,27 +3270,55 @@ function initSidebarNavigation() {
 
 function renderZones() {
   const zoneList = document.getElementById('zone-list');
+  if (!zoneList) return;
   zoneList.innerHTML = zones.map((z, i) => {
-    const locked = i >= state.unlockedZones;
-    return `<div class="slot ${locked ? 'small' : ''}">
-      <div class="flex"><strong>${z.name}</strong><span>Lv ${z.recommendedLevel || z.level}</span></div>
-      <div class="tiny muted">Mat tiers: ${z.allowedMaterialTiers.join(', ')}</div>
-      <div>${locked ? 'Locked' : ''}</div>
-    </div>`;
+    const unlocked = isZoneUnlocked(i);
+    const classes = ['zone-card'];
+    if (!unlocked) classes.push('zone-card--locked');
+    if (i === state.currentZone) classes.push('zone-card--active');
+    const lockedLabel = unlocked ? '' : '<div class="zone-locked-label">Locked</div>';
+    return `<button class="${classes.join(' ')}" data-zone-id="${i}" ${!unlocked ? 'disabled' : ''}>
+      <div class="zone-name">${z.name}</div>
+      <div class="zone-level">Lv ${z.recommendedLevel || z.level}</div>
+      <div class="zone-mats">Mat tiers: ${z.allowedMaterialTiers.join(', ')}</div>
+      ${lockedLabel}
+    </button>`;
   }).join('');
-  zoneList.querySelectorAll('.slot').forEach((div, idx) => {
-    if (idx < state.unlockedZones) {
-      div.onclick = () => {
-        const cd = getActionCooldownState('TRAVEL');
-        if (!cd.ready) { logMessage(`Traveling... ready in ${formatCooldown(cd.remaining)}.`); return; }
-        startActionCooldown('TRAVEL');
-        state.currentZone = idx;
-        logMessage(`Traveling to ${zones[idx].name}.`);
-        updateAll();
-      };
-    }
+  zoneList.querySelectorAll('.zone-card').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = Number(btn.dataset.zoneId);
+      handleZoneCardClick(target);
+    });
   });
+  updateZoneHeader();
   renderEpicActionButtons();
+}
+
+function handleZoneCardClick(targetZone) {
+  const zone = zones[targetZone];
+  if (!zone || !state.player) return;
+  if (!isZoneUnlocked(targetZone)) { logMessage('You have not unlocked this zone yet.'); return; }
+  if (targetZone === state.currentZone) { updateZoneHeader(); return; }
+  const travelCd = getActionCooldownState('TRAVEL_ZONE');
+  if (!travelCd.ready) { logMessage(`Travel ready in ${formatCooldown(travelCd.remaining)}.`); return; }
+  state.currentZone = targetZone;
+  startActionCooldown('TRAVEL_ZONE');
+  logMessage(`Traveling to ${zone.name}. Next move available in 20 minutes.`);
+  updateAll();
+}
+
+function updateZoneHeader() {
+  const label = document.getElementById('current-zone-label');
+  const zone = zones[state.currentZone];
+  if (label) label.textContent = zone ? `Current: ${zone.name}` : 'Current: -';
+  updateTravelCooldownUI();
+}
+
+function updateTravelCooldownUI() {
+  const travel = document.getElementById('travel-cooldown-label');
+  if (!travel) return;
+  const remaining = getActionRemainingMs('TRAVEL_ZONE');
+  travel.textContent = remaining <= 0 ? 'Travel ready' : `Travel in ${formatCooldown(remaining)}`;
 }
 
 function renderEpicActionButtons() {
@@ -3291,7 +3327,7 @@ function renderEpicActionButtons() {
   const zone = zones[state.currentZone];
   if (!zone) { wrap.innerHTML = '<div class="small">Pick a zone to start actions.</div>'; return; }
   wrap.innerHTML = '';
-  const lockedZone = state.currentZone >= state.unlockedZones;
+  const lockedZone = !isZoneUnlocked(state.currentZone);
   epicActions.forEach(action => {
     const btn = document.createElement('button');
     const cd = getActionCooldownState(action.cooldownId || action.id);
@@ -3323,7 +3359,7 @@ function renderEpicActionButtons() {
 function updateEpicActionTimers() {
   const buttons = document.querySelectorAll('#epic-actions [data-action-key]');
   const zone = zones[state.currentZone];
-  const lockedZone = state.currentZone >= state.unlockedZones;
+  const lockedZone = !isZoneUnlocked(state.currentZone);
   buttons.forEach(btn => {
     const key = btn.dataset.actionKey;
     const label = btn.dataset.baseLabel || key;
@@ -3351,6 +3387,7 @@ function updateEpicActionTimers() {
   renderTowerPanel();
   renderWorldBossPanel();
   updateLifeSkillCooldownCards();
+  updateTravelCooldownUI();
 }
 
 function updateLifeSkillCooldownCards() {
@@ -3377,18 +3414,18 @@ function updateFightButtons() {
   const bossLocked = state.player ? state.player.level < bossLevelLock : true;
   const inCombat = CombatSystem.active;
   if (fightBtn) {
-    const fightLocked = state.currentZone >= state.unlockedZones || inCombat;
+    const fightLocked = !isZoneUnlocked(state.currentZone) || inCombat;
     let fightLabel = 'Fight';
     if (!fightState.ready) fightLabel = `Fight (${formatCooldown(fightState.remaining)})`;
-    if (fightLocked) fightLabel = `Fight (${state.currentZone >= state.unlockedZones ? 'Zone Locked' : 'In Combat'})`;
+    if (fightLocked) fightLabel = `Fight (${!isZoneUnlocked(state.currentZone) ? 'Zone Locked' : 'In Combat'})`;
     fightBtn.textContent = fightLabel;
     fightBtn.disabled = fightLocked || !fightState.ready;
   }
   if (bossBtn) {
-    const fightLocked = state.currentZone >= state.unlockedZones || inCombat;
+    const fightLocked = !isZoneUnlocked(state.currentZone) || inCombat;
     let bossLabel = 'Boss Fight';
     if (!fightState.ready) bossLabel = `Boss Fight (${formatCooldown(fightState.remaining)})`;
-    if (fightLocked) bossLabel = `Boss Fight (${state.currentZone >= state.unlockedZones ? 'Zone Locked' : 'In Combat'})`;
+    if (fightLocked) bossLabel = `Boss Fight (${!isZoneUnlocked(state.currentZone) ? 'Zone Locked' : 'In Combat'})`;
     if (bossLocked) bossLabel = `Boss Fight (Lv ${bossLevelLock})`;
     bossBtn.textContent = bossLabel;
     bossBtn.disabled = fightLocked || !fightState.ready || bossLocked;
