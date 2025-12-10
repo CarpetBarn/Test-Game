@@ -1,14 +1,14 @@
 // Simple RNG Looter RPG built with vanilla JS
 // Systems: combat, loot, skills, dragons, events, saving
 
-const ENEMY_SCALE = 2;
+const ENEMY_SCALE = 2.5;
 const ENEMY_ATTACK_MOD = 5 / 6; // global reduction to enemy attack power
 const MAX_LEVEL = 200;
 const MAX_COMBAT_LOG_ENTRIES = 10;
 const EGG_DROP_BONUS = 0.06;
 const EGG_CHANCE_MULT = 1.15;
-const BOSS_SCALE = 1.12;
-const LOOT_CHANCE_MULT = 1.25;
+const BOSS_SCALE = 1.22;
+const LOOT_CHANCE_MULT = 1.15;
 const SAVE_DEBOUNCE_MS = 6000;
 
 function xpForLevel(level) {
