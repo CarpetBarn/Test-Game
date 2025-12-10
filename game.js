@@ -3223,7 +3223,7 @@ function fuseItemsById(idA, idB) {
   if (typeof updateAll === 'function') {
     updateAll();
   }
-}
+
 
 
 function requiredPlayerLevelForTier(tier) {
