@@ -2,18 +2,18 @@
 // Systems: combat, loot, skills, dragons, events, saving
 
 const ENEMY_SCALE = 2;
-const ENEMY_ATTACK_MOD = 5 / 6; // global reduction to enemy attack power
+const ENEMY_ATTACK_MOD = 7 / 8; // global reduction to enemy attack power
 const MAX_LEVEL = 200;
 const MAX_COMBAT_LOG_ENTRIES = 10;
 const EGG_DROP_BONUS = 0.06;
-const EGG_CHANCE_MULT = 1.15;
-const BOSS_SCALE = 1.12;
-const LOOT_CHANCE_MULT = 1.25;
+const EGG_CHANCE_MULT = 1.05;
+const BOSS_SCALE = 1.42;
+const LOOT_CHANCE_MULT = 1.15;
 const SAVE_DEBOUNCE_MS = 6000;
 
 function xpForLevel(level) {
   const base = 50;
-  const growth = 1.85;
+  const growth = 1.95;
   return Math.floor(base * Math.pow(Math.max(1, level), growth));
 }
 
@@ -35,8 +35,8 @@ const EventBus = {
 };
 
 const zoneRarityWeights = {
-  1: { common: 0.7, uncommon: 0.25, rare: 0.05, epic: 0, legendary: 0 },
-  2: { common: 0.6, uncommon: 0.3, rare: 0.09, epic: 0.01, legendary: 0 },
+  1: { common: 0.7, uncommon: 0.25, rare: 0.05, epic: 0.002, legendary: 0.0001 },
+  2: { common: 0.6, uncommon: 0.3, rare: 0.09, epic: 0.01, legendary: 0.001 },
   3: { common: 0.5, uncommon: 0.3, rare: 0.15, epic: 0.04, legendary: 0.01 },
   4: { common: 0.4, uncommon: 0.3, rare: 0.2, epic: 0.08, legendary: 0.02 },
   5: { common: 0.3, uncommon: 0.3, rare: 0.25, epic: 0.1, legendary: 0.05 },
@@ -47,9 +47,9 @@ const zoneRarityWeights = {
 const rarities = [
   { key: 'common', label: 'Common', color: 'common', weight: 70, stats: [1, 2], scale: 1 },
   { key: 'uncommon', label: 'Uncommon', color: 'uncommon', weight: 22, stats: [2, 3], scale: 1.08 },
-  { key: 'rare', label: 'Rare', color: 'rare', weight: 6, stats: [3, 4], scale: 1.2 },
-  { key: 'epic', label: 'Epic', color: 'epic', weight: 2, stats: [4, 5], scale: 1.35 },
-  { key: 'legendary', label: 'Legendary', color: 'legendary', weight: 0.5, stats: [4, 5], scale: 1.55 },
+  { key: 'rare', label: 'Rare', color: 'rare', weight: 6, stats: [2,3, 4], scale: 1.15 },
+  { key: 'epic', label: 'Epic', color: 'epic', weight: 2, stats: [ 3, 4, 5], scale: 1.20 },
+  { key: 'legendary', label: 'Legendary', color: 'legendary', weight: 0.5, stats:  [4, 5], scale: 1.35 },
 ];
 
 const ELEMENTS = ['physical', 'fire', 'frost', 'nature', 'shadow', 'storm', 'earth', 'holy'];
@@ -1206,10 +1206,10 @@ const ACTIONS = {
 
 const epicActions = [
   { id: 'hunt', cooldownId: 'HUNT', label: 'Hunt', type: 'combat', difficulty: 0.9, description: 'Fast skirmish for quick loot.' },
-  { id: 'adventure', cooldownId: 'ADVENTURE', label: 'Adventure', type: 'combat', difficulty: 1.1, description: 'Longer battle with better rewards.' },
-  { id: 'dungeon', cooldownId: 'DUNGEON', label: 'Dungeon', type: 'combat', difficulty: 1.35, treatAsBoss: true, noUnlock: true, description: 'Hard encounter with superior loot.' },
-  { id: 'miniboss', cooldownId: 'MINIBOSS', label: 'Miniboss', type: 'combat', difficulty: 1.22, treatAsBoss: true, noUnlock: true, description: 'Zone elite with higher stakes.' },
-  { id: 'boss', cooldownId: 'BOSS', label: 'Boss', type: 'combat', difficulty: 1.45, treatAsBoss: true, description: 'Zone boss unlocks next realm.' },
+  { id: 'adventure', cooldownId: 'ADVENTURE', label: 'Adventure', type: 'combat', difficulty: 1.3, description: 'Longer battle with better rewards.' },
+  { id: 'dungeon', cooldownId: 'DUNGEON', label: 'Dungeon', type: 'combat', difficulty: 1.55, treatAsBoss: true, noUnlock: true, description: 'Hard encounter with superior loot.' },
+  { id: 'miniboss', cooldownId: 'MINIBOSS', label: 'Miniboss', type: 'combat', difficulty: 1.72, treatAsBoss: true, noUnlock: true, description: 'Zone elite with higher stakes.' },
+  { id: 'boss', cooldownId: 'BOSS', label: 'Boss', type: 'combat', difficulty: 2.45, treatAsBoss: true, description: 'Zone boss unlocks next realm.' },
   { id: 'chop', cooldownId: 'CHOP', label: 'Chop Wood', type: 'gather', skill: 'foraging', sourceType: 'foraging', description: 'Chop or forage timber in the area.' },
   { id: 'mine', cooldownId: 'MINE', label: 'Mine Ore', type: 'gather', skill: 'mining', sourceType: 'mining', description: 'Mine ore nodes tied to the zone tier.' },
   { id: 'fish', cooldownId: 'FISH', label: 'Fish', type: 'gather', skill: 'fishing', sourceType: 'fishing', description: 'Cast for fish or treasures.' },
@@ -1501,7 +1501,7 @@ function createPlayer(cls) {
     name: 'Adventurer',
     class: cls,
     baseStats: { ...base },
-    level: 1,
+    level: = 1,
     xp: 0,
     xpToNext: xpToNextLevel(1),
     gold: 50,
@@ -2636,7 +2636,7 @@ function finishCombat(result, bossFlag) {
   const isGateBoss = payload.options?.isGateBoss;
   if (victory) {
     const xpBoost = 1 + (player.modifiers.xpBoost || 0);
-    const xpGain = Math.max(1, Math.round(state.currentEnemy.xp * (1 / 3) * 1.25 * 1.15 * xpBoost));
+    const xpGain = Math.max(1, Math.round(state.currentEnemy.xp * (1 / 3) * 1.25 * 1.20 * xpBoost));
     const goldGain = Math.round(state.currentEnemy.gold * 1.18 * (1 + (player.modifiers.goldBoost || 0)));
     player.xp += xpGain;
     player.gold += goldGain;
@@ -2716,7 +2716,7 @@ function levelCheck() {
     player.baseStats.hp += 8;
     player.baseStats.attack += 2;
     player.baseStats.defense += 1;
-    player.baseStats.crit += 0.5;
+    player.baseStats.crit += 0.25;
     player.xpToNext = xpToNextLevel(player.level);
     player.skillPoints++;
     const derived = applyBonuses(player.baseStats, player);
@@ -3152,26 +3152,79 @@ function enhanceItem(itemId) {
 }
 
 function fuseItemsById(idA, idB) {
-  const inv = state.inventory.filter(i => i.type === 'gear');
-  if (inv.length < 2) { logMessage('Store at least two gear pieces in inventory to fuse.'); return; }
-  if (!idA || !idB || idA === idB) { logMessage('Choose two different items.'); return; }
-  const a = inv.find(i => i.id === idA);
-  const b = inv.find(i => i.id === idB);
-  if (!a || !b) { logMessage('Fusion uses inventory gear only.'); return; }
-  ensureItemMeta(a); ensureItemMeta(b);
-  if (a.slot !== b.slot) { logMessage('Items must be same slot.'); return; }
-  if ((a.gearTier || 1) !== (b.gearTier || 1)) { logMessage('Items must share gear tier.'); return; }
-  const newTier = Math.min(5, (a.gearTier || 1) + (a.rarity === b.rarity ? 1 : 0));
+  // 1) Treat anything with a slot as gear (more forgiving than type === 'gear')
+  const invGear = state.inventory.filter(i => i && (i.type === 'gear' || i.slot));
+
+  if (invGear.length < 2) {
+    logMessage('Store at least two gear pieces in inventory to fuse.');
+    console.warn('[Fuse] Not enough gear in inventory:', invGear);
+    return;
+  }
+
+  if (!idA || !idB || idA === idB) {
+    logMessage('Choose two different items.');
+    console.warn('[Fuse] Invalid ids:', { idA, idB });
+    return;
+  }
+
+  const a = invGear.find(i => i.id === idA);
+  const b = invGear.find(i => i.id === idB);
+
+  if (!a || !b) {
+    logMessage('Fusion uses inventory gear only.');
+    console.warn('[Fuse] Items not found in inventory:', { idA, idB, invGear });
+    return;
+  }
+
+  ensureItemMeta(a);
+  ensureItemMeta(b);
+
+  if (!a.slot || !b.slot) {
+    console.error('[Fuse] One of the items is missing a slot:', { a, b });
+    logMessage('Items must be equippable gear to fuse.');
+    return;
+  }
+
+  if (a.slot !== b.slot) {
+    logMessage('Items must be same slot.');
+    console.warn('[Fuse] Slot mismatch:', a.slot, b.slot);
+    return;
+  }
+
+  const tierA = a.gearTier || 1;
+  const tierB = b.gearTier || 1;
+
+  if (tierA !== tierB) {
+    logMessage('Items must share gear tier.');
+    console.warn('[Fuse] Tier mismatch:', tierA, tierB);
+    return;
+  }
+
+  // 2) Calculate new tier (same as your logic, capped at 5)
+  const sameRarity = a.rarity === b.rarity;
+  const newTier = Math.min(5, tierA + (sameRarity ? 1 : 0));
+
+  // 3) Generate new fused item
+  //    NOTE: make sure this matches the real signature of generateItem in your code
   const newItem = generateItem(state.player.level + newTier, false);
+
   newItem.slot = a.slot;
   newItem.name = `Fused ${a.slot.charAt(0).toUpperCase() + a.slot.slice(1)}`;
   newItem.gearTier = newTier;
   ensureItemMeta(newItem);
+
+  // 4) Remove old items and add new one
   state.inventory = state.inventory.filter(i => i.id !== a.id && i.id !== b.id);
   state.inventory.push(newItem);
+
   logMessage(`Fusion created ${newItem.name} (Tier ${newTier}).`);
-  updateAll();
+  console.log('[Fuse] Created new fused item:', newItem);
+
+  if (typeof updateAll === 'function') {
+    updateAll();
+  }
 }
+
 
 function requiredPlayerLevelForTier(tier) {
   switch (tier) {
