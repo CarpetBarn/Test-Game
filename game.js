@@ -9,6 +9,190 @@ const rarities = [
   { key: 'legendary', label: 'Legendary', color: 'legendary', weight: 0.5, stats: [4, 5], scale: 1.55 },
 ];
 
+const ELEMENTS = ['physical', 'fire', 'frost', 'nature', 'shadow', 'storm', 'earth', 'holy'];
+const elementMatrix = {
+  fire: { nature: 1.25, frost: 0.75, earth: 1.05 },
+  frost: { fire: 1.25, storm: 0.9 },
+  nature: { earth: 1.2, fire: 0.8 },
+  shadow: { holy: 0.75 },
+  holy: { shadow: 1.25, undead: 1.25 },
+  storm: { frost: 1.15 },
+  earth: { physical: 0.9, nature: 0.85 },
+};
+
+function getElementMultiplier(attacker = 'physical', defender = 'physical') {
+  const source = elementMatrix[attacker] || {};
+  return source[defender] || 1;
+}
+
+const rarityOrder = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
+
+const DEFAULT_SETTINGS = {
+  uiScale: 'medium',
+  animations: true,
+  lootFilterMode: 'normal',
+  colorblindMode: false,
+  mobileLayoutMode: false,
+};
+
+let settings = { ...DEFAULT_SETTINGS };
+
+function setVh() {
+  const vh = window.innerHeight * 0.01;
+  document.documentElement.style.setProperty('--vh', `${vh}px`);
+}
+window.addEventListener('resize', () => {
+  setVh();
+  applySettings();
+});
+
+function loadSettings() {
+  const raw = localStorage.getItem('gameSettings');
+  if (!raw) return;
+  try {
+    const parsed = JSON.parse(raw);
+    settings = { ...settings, ...parsed };
+  } catch (e) {
+    console.error('Failed to parse settings', e);
+  }
+}
+
+function saveSettings() {
+  localStorage.setItem('gameSettings', JSON.stringify(settings));
+}
+
+function isMobileViewport() {
+  return window.innerWidth < 768;
+}
+
+function setNavOpen(open) {
+  state.ui.navOpen = open;
+  const sidebar = document.querySelector('.sidebar');
+  if (sidebar) sidebar.classList.toggle('open', open || !state.ui.mobileActive);
+}
+
+function toggleNav() {
+  setNavOpen(!state.ui.navOpen);
+}
+
+function updateSettingsCardLabels() {
+  const map = {
+    'ui-scale': settings.uiScale === 'small' ? 'Small' : settings.uiScale === 'large' ? 'Large' : 'Medium',
+    animations: settings.animations ? 'On' : 'Off',
+    'loot-filters':
+      settings.lootFilterMode === 'normal'
+        ? 'All loot'
+        : settings.lootFilterMode === 'hideCommons'
+        ? 'Hide Commons'
+        : 'Rare+ only',
+    'colorblind-mode': settings.colorblindMode ? 'Enabled' : 'Disabled',
+    'mobile-layout': settings.mobileLayoutMode ? 'Enabled' : 'Disabled',
+  };
+  document.querySelectorAll('[data-setting-value]').forEach(el => {
+    const key = el.dataset.settingValue;
+    if (map[key] != null) el.textContent = map[key];
+  });
+}
+
+function updateLootFilterBehavior() {
+  const mode = settings.lootFilterMode || 'normal';
+  const defaultMin = mode === 'hideCommons' ? 'uncommon' : mode === 'rarePlus' ? 'rare' : 'common';
+  state.filters.minRarity = defaultMin;
+  const raritySelect = document.getElementById('filter-rarity');
+  if (raritySelect) {
+    raritySelect.value = mode === 'normal' ? 'all' : defaultMin;
+  }
+  if (state.player) renderInventory();
+}
+
+function setLootFilter(opts = {}) {
+  if (opts.minRarity) {
+    state.filters.minRarity = opts.minRarity;
+    const raritySelect = document.getElementById('filter-rarity');
+    if (raritySelect && raritySelect.value === 'all') {
+      raritySelect.value = opts.minRarity;
+    }
+  }
+  if (state.player) renderInventory();
+}
+
+function applySettings() {
+  const root = document.documentElement;
+  const body = document.body;
+  const autoMobile = isMobileViewport();
+  const mobileActive = settings.mobileLayoutMode || autoMobile;
+  const prevMobile = state.ui.mobileActive;
+  state.ui.autoMobile = autoMobile;
+  state.ui.mobileActive = mobileActive;
+  if (settings.uiScale === 'small') {
+    root.style.setProperty('--ui-scale', '0.9');
+  } else if (settings.uiScale === 'large') {
+    root.style.setProperty('--ui-scale', '1.1');
+  } else {
+    root.style.setProperty('--ui-scale', '1');
+  }
+
+  if (settings.animations) {
+    body.classList.remove('animations-off');
+  } else {
+    body.classList.add('animations-off');
+  }
+
+  if (settings.colorblindMode) {
+    body.classList.add('colorblind-mode');
+  } else {
+    body.classList.remove('colorblind-mode');
+  }
+
+  if (mobileActive) body.setAttribute('data-mobile', 'true');
+  else body.removeAttribute('data-mobile');
+
+  if (mobileActive && !prevMobile) {
+    setNavOpen(false);
+  } else if (!mobileActive && !state.ui.navOpen) {
+    setNavOpen(true);
+  } else {
+    setNavOpen(state.ui.navOpen);
+  }
+
+  updateLootFilterBehavior();
+  updateSettingsCardLabels();
+}
+
+function onSettingCardClick(settingId) {
+  switch (settingId) {
+    case 'ui-scale':
+      settings.uiScale = settings.uiScale === 'small' ? 'medium' : settings.uiScale === 'medium' ? 'large' : 'small';
+      break;
+    case 'animations':
+      settings.animations = !settings.animations;
+      break;
+    case 'loot-filters':
+      if (settings.lootFilterMode === 'normal') settings.lootFilterMode = 'hideCommons';
+      else if (settings.lootFilterMode === 'hideCommons') settings.lootFilterMode = 'rarePlus';
+      else settings.lootFilterMode = 'normal';
+      break;
+    case 'colorblind-mode':
+      settings.colorblindMode = !settings.colorblindMode;
+      break;
+    case 'mobile-layout':
+      settings.mobileLayoutMode = !settings.mobileLayoutMode;
+      break;
+    default:
+      break;
+  }
+  saveSettings();
+  applySettings();
+}
+
+function initSettingsCards() {
+  document.querySelectorAll('.setting-card').forEach(card => {
+    const settingId = card.dataset.setting;
+    if (!settingId) return;
+    card.addEventListener('click', () => onSettingCardClick(settingId));
+  });
+}
+
 const statPool = [
   { key: 'hp', label: 'Max HP', base: 10 },
   { key: 'attack', label: 'Attack', base: 2 },
