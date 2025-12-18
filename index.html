@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#0b1220">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>RNG Looter RPG</title>
+  <link rel="manifest" href="./manifest.json">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div id="class-select" class="modal">
+    <div class="modal-content">
+      <h2>Choose Your Class</h2>
+      <div id="class-options" class="class-grid"></div>
+    </div>
+  </div>
+
+  <div class="app-shell full-height">
+    <header class="app-header">
+      <div class="brand-block">
+        <button id="menu-toggle" class="menu-toggle" aria-label="Toggle navigation">☰</button>
+        <div class="brand-title">RNG Looter RPG</div>
+        <div class="brand-sub">Modern adventure dashboard</div>
+      </div>
+      <div class="header-center">
+        <div class="identity">
+          <span id="player-name" class="pill">Adventurer</span>
+          <span class="muted">•</span>
+          <span id="player-class" class="pill soft"></span>
+        </div>
+        <div class="bar-stack">
+          <div class="bar-block">
+            <div class="bar"><div id="hp-bar" class="fill hp-bar-fill"></div></div>
+            <span id="hp-text" class="bar-label"></span>
+          </div>
+          <div id="rage-container" class="bar-block">
+            <div class="resource-label">Rage</div>
+            <div class="resource-bar rage-bar">
+              <div id="player-rage-bar" class="resource-bar-fill rage-bar-fill"></div>
+            </div>
+            <div id="player-rage-text" class="resource-text">0 / 100</div>
+          </div>
+          <div class="bar-block">
+            <div class="bar mana"><div id="resource-bar" class="fill"></div></div>
+            <span id="resource-text" class="bar-label"></span>
+          </div>
+          <div class="bar-block">
+            <div class="bar xp"><div id="xp-bar" class="fill"></div></div>
+            <span id="xp-text" class="bar-label"></span>
+          </div>
+        </div>
+      </div>
+      <div class="header-meta">
+        <div class="meta-line"><span id="player-level"></span></div>
+        <div class="meta-line"><span id="player-gold"></span></div>
+        <div class="meta-line"><span id="player-dragon"></span></div>
+        <div class="meta-line"><span id="player-prestige"></span></div>
+        <div class="meta-actions">
+          <button id="prestige-btn" class="ghost">Prestige</button>
+          <button id="reset-btn" class="ghost danger">Reset</button>
+        </div>
+      </div>
+    </header>
+
+    <div class="app-body">
+      <aside class="sidebar full-height">
+        <div class="nav-title">Navigate</div>
+        <button class="nav-item is-active" data-section="combat-panel">⚔ Combat</button>
+        <button class="nav-item" data-section="zones-panel">🗺 Zones</button>
+        <button class="nav-item" data-section="inventory-panel">🎒 Inventory</button>
+        <button class="nav-item" data-section="skill-trees-panel">🌟 Skill Trees</button>
+        <button class="nav-item" data-section="life-skills-panel">🌱 Life Skills</button>
+        <button class="nav-item" data-section="dragons-panel">🐉 Dragons</button>
+        <button class="nav-item" data-section="shop-panel">🛒 Shop</button>
+        <button class="nav-item" data-section="settings-panel">⚙ Settings</button>
+        <div class="nav-log card-soft">
+          <div class="nav-log-title">Activity Log</div>
+          <div id="combat-log" class="log nav-log-body"></div>
+        </div>
+      </aside>
+
+      <main class="main-content full-height">
+        <header class="player-header">
+          <div class="player-header-top">
+            <div class="player-identity">
+              <span id="player-name" class="player-name">Adventurer</span>
+              <span id="player-class" class="player-badge player-class">Warrior</span>
+              <span id="player-level" class="player-badge player-level">Lv 1</span>
+            </div>
+            <div class="player-core-stats">
+              <span>HP: <span id="player-hp">0 / 0</span></span>
+              <span>ATK: <span id="player-atk">0</span></span>
+              <span>DEF: <span id="player-def">0</span></span>
+              <span>CRIT: <span id="player-crit">0%</span></span>
+              <span>CRIT DMG: <span id="player-crit-dmg">0%</span></span>
+              <span>ELEM DMG: <span id="player-element">-</span></span>
+              <span>SPD: <span id="player-speed">0</span></span>
+            </div>
+            <button id="player-stats-toggle" class="player-stats-toggle">Show details</button>
+          </div>
+          <div id="player-stats-details" class="player-stats-details" hidden>
+            <div class="stats-grid">
+              <div class="stat-cell"><span class="label">Accuracy</span><span id="stat-accuracy" class="value">-</span></div>
+              <div class="stat-cell"><span class="label">Evasion</span><span id="stat-evasion" class="value">-</span></div>
+              <div class="stat-cell"><span class="label">Block Chance</span><span id="stat-block" class="value">-</span></div>
+              <div class="stat-cell"><span class="label">Crit Damage</span><span id="stat-crit-dmg" class="value">-</span></div>
+              <div class="stat-cell"><span class="label">Lifesteal</span><span id="stat-life-steal" class="value">-</span></div>
+              <div class="stat-cell"><span class="label">Fire ATK</span><span id="stat-fire-atk" class="value">-</span></div>
+              <div class="stat-cell"><span class="label">Frost ATK</span><span id="stat-frost-atk" class="value">-</span></div>
+              <div class="stat-cell"><span class="label">Shadow ATK</span><span id="stat-shadow-atk" class="value">-</span></div>
+              <div class="stat-cell"><span class="label">Fire RES</span><span id="stat-fire-res" class="value">-</span></div>
+              <div class="stat-cell"><span class="label">Frost RES</span><span id="stat-frost-res" class="value">-</span></div>
+              <div class="stat-cell"><span class="label">Shadow RES</span><span id="stat-shadow-res" class="value">-</span></div>
+              <div class="stat-cell"><span class="label">XP Bonus</span><span id="stat-bonus-xp" class="value">-</span></div>
+              <div class="stat-cell"><span class="label">Gold Bonus</span><span id="stat-bonus-gold" class="value">-</span></div>
+              <div class="stat-cell"><span class="label">Loot Bonus</span><span id="stat-bonus-loot" class="value">-</span></div>
+              <div class="stat-cell"><span class="label">CDR</span><span id="stat-cdr" class="value">-</span></div>
+              <div class="stat-cell"><span class="label">Boss DMG</span><span id="stat-boss-dmg" class="value">-</span></div>
+              <div class="stat-cell"><span class="label">Dungeon DMG</span><span id="stat-dungeon-dmg" class="value">-</span></div>
+            </div>
+          </div>
+        </header>
+
+        <section id="combat-panel" class="main-panel is-visible">
+          <div class="view-header">
+            <div class="section-title">Combat</div>
+            <div class="section-sub">Turn-based actions with smooth feedback.</div>
+          </div>
+          <section class="panel card center" id="combat-card">
+            <div class="panel-header">
+              <div>
+                <h3>Battlefield</h3>
+                <p class="muted">Engage enemies and bosses.</p>
+              </div>
+              <div class="badge">Live</div>
+            </div>
+            <div id="enemy-display" class="enemy-card"></div>
+            <div class="bars inline">
+              <div class="bar enemy"><div id="enemy-hp" class="fill"></div><span id="enemy-hp-text"></span></div>
+            </div>
+            <div class="status-row">
+              <div>
+                <div class="small label">Player Status</div>
+                <div id="player-status" class="status-icons"></div>
+              </div>
+              <div>
+                <div class="small label">Enemy Status</div>
+                <div id="enemy-status" class="status-icons"></div>
+              </div>
+            </div>
+            <div id="battle-info" class="small info"></div>
+            <div id="action-panel" class="action-bar">
+              <button id="attack-btn" class="primary">Basic Attack</button>
+              <button id="heal-btn" class="ghost">Heal</button>
+              <div id="skill-actions" class="skill-actions"></div>
+            </div>
+          </section>
+          <div id="auto-battle-container" class="panel card soft">
+            <div class="panel-header">
+              <div>
+                <h4>Auto Battles</h4>
+                <p class="muted">Fast sims with reduced XP (15s cooldown).</p>
+              </div>
+            </div>
+            <div class="auto-row">
+              <label for="auto-count" class="small">Auto battles</label>
+              <input id="auto-count" type="number" min="1" max="10" value="3">
+            </div>
+            <div class="auto-actions" id="auto-actions">
+              <button id="fight-btn" class="primary">Fight!</button>
+              <button id="boss-btn" class="warning">Fight Boss</button>
+              <button id="auto-btn" class="ghost">Auto Battle</button>
+            </div>
+            <div id="auto-summary" class="tiny muted auto-summary"></div>
+          </div>
+          <div class="gate-boss-row">
+            <button id="gate-boss-button" class="gate-boss-btn ghost">Challenge Gate Boss</button>
+            <span id="gate-boss-info" class="gate-boss-info tiny muted"></span>
+          </div>
+          <div id="combat-epic-actions-mount" class="epic-action-wrap"></div>
+        </section>
+
+        <section id="zones-panel" class="main-panel">
+          <div class="view-header">
+            <div class="section-title">Zones</div>
+            <div class="section-sub">Choose a realm, review unlocks, and travel.</div>
+          </div>
+          <section id="zones-card" class="panel card">
+            <div class="panel-header">
+              <div>
+                <h3>Zones</h3>
+                <p class="muted">Pick a realm and review rewards.</p>
+              </div>
+              <div class="zone-travel-status">
+                <div id="current-zone-label" class="pill pill-soft">Current: Verdantwild</div>
+                <div id="travel-cooldown-label" class="tiny muted"></div>
+              </div>
+            </div>
+            <div id="zone-list" class="zone-card-list"></div>
+            <div id="event-area" class="event card-soft"></div>
+          </section>
+        </section>
+
+        <section id="inventory-panel" class="main-panel">
+          <div class="view-header">
+            <div class="section-title">Inventory &amp; Gear</div>
+            <div class="section-sub">Equip, socket, enhance, fuse, and manage your haul.</div>
+          </div>
+          <div class="panel card">
+            <div class="panel-split">
+              <div>
+                <h4 class="muted">Gear &amp; Sockets</h4>
+                <div id="equipment-slots"></div>
+              </div>
+              <div>
+                <h4 class="muted">Sockets &amp; Augments</h4>
+                <div id="socket-panel"></div>
+              </div>
+            </div>
+          </div>
+          <div class="panel card">
+            <div class="panel-split">
+              <div>
+                <h4 class="muted">Enhance Gear</h4>
+                <div id="enhance-panel"></div>
+              </div>
+              <div>
+                <h4 class="muted">Fuse Gear</h4>
+                <div id="fusion-panel"></div>
+              </div>
+            </div>
+          </div>
+          <div class="panel card">
+            <div class="filters">
+              <label>Slot
+                <select id="filter-slot">
+                  <option value="all">All</option>
+                  <option value="weapon">Weapon</option>
+                  <option value="armor">Armor</option>
+                  <option value="helmet">Helmet</option>
+                  <option value="boots">Boots</option>
+                  <option value="accessory">Accessory</option>
+                </select>
+              </label>
+              <label>Rarity
+                <select id="filter-rarity">
+                  <option value="all">All</option>
+                  <option value="common">Common</option>
+                  <option value="uncommon">Uncommon</option>
+                  <option value="rare">Rare</option>
+                  <option value="epic">Epic</option>
+                  <option value="legendary">Legendary</option>
+                </select>
+              </label>
+              <label>Type
+                <select id="filter-type">
+                  <option value="all">All</option>
+                  <option value="gear">Gear</option>
+                  <option value="potion">Healing</option>
+                  <option value="food">Food</option>
+                  <option value="egg">Egg</option>
+                  <option value="material">Materials</option>
+                  <option value="gem">Gems</option>
+                </select>
+              </label>
+              <button id="sell-filtered" class="wide ghost">Sell All Shown</button>
+            </div>
+            <div id="inventory-list"></div>
+          </div>
+        </section>
+
+        <section id="skill-trees-panel" class="main-panel">
+          <div class="view-header">
+            <div class="section-title">Skill Trees</div>
+            <div class="section-sub">Unlock branch nodes and power up.</div>
+          </div>
+          <div class="panel card">
+            <div class="skill-points-row">Skill Points: <span id="skill-points">0</span></div>
+            <div id="skill-trees-container"></div>
+          </div>
+        </section>
+
+        <section id="life-skills-panel" class="main-panel">
+          <div class="view-header">
+            <div class="section-title">Life Skills</div>
+            <div class="section-sub">Harvest, craft, refine, and cook with your professions.</div>
+          </div>
+          <div class="panel card">
+            <div class="life-layout">
+              <div class="life-detail-col">
+                <div class="life-detail-head">
+                  <div class="life-detail-title">
+                    <h4 id="life-selected-title">Actions</h4>
+                    <div id="life-selected-meta" class="small muted"></div>
+                  </div>
+                </div>
+                <div id="life-actions"></div>
+                <h4>Recipes</h4>
+                <div id="life-recipes"></div>
+                <div id="refine-panel"></div>
+              </div>
+              <div class="life-meta-col">
+                <h4>Professions</h4>
+                <div id="life-skill-list"></div>
+                <div id="materials-list"></div>
+                <div id="perk-panel"></div>
+              </div>
+            </div>
+          </div>
+          <div class="panel card">
+            <div class="panel-header">
+              <div>
+                <h4>EPIC RPG Systems</h4>
+                <p class="muted small">Dungeons, bosses, jobs, quests, tower, and world features.</p>
+              </div>
+            </div>
+            <div class="panel-split">
+              <div class="card-soft" id="dungeon-panel"></div>
+              <div class="card-soft" id="jobs-panel"></div>
+            </div>
+            <div class="panel-split">
+              <div class="card-soft" id="quests-panel"></div>
+              <div class="card-soft" id="tower-panel"></div>
+            </div>
+            <div class="panel-split">
+              <div class="card-soft" id="worldboss-panel"></div>
+              <div class="card-soft" id="chest-panel"></div>
+            </div>
+            <div class="panel-split">
+              <div class="card-soft" id="map-panel"></div>
+              <div class="card-soft" id="rebirth-panel"></div>
+            </div>
+            <div class="panel-split">
+              <div class="card-soft" id="history-panel"></div>
+            </div>
+          </div>
+        </section>
+
+        <section id="dragons-panel" class="main-panel">
+          <div class="view-header">
+            <div class="section-title">Dragons</div>
+            <div class="section-sub">Hatch, bond, and breed companions.</div>
+          </div>
+          <div class="panel card">
+            <div class="panel-split">
+              <div>
+                <h4 class="muted">Egg Incubation</h4>
+                <div id="egg-list"></div>
+                <div id="combine-area"></div>
+                <div id="breeding-panel"></div>
+              </div>
+              <div>
+                <h4 class="muted">Active Companion</h4>
+                <div id="active-dragon"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="shop-panel" class="main-panel">
+          <div class="view-header">
+            <div class="section-title">Shop</div>
+            <div class="section-sub">Refresh wares and purchase upgrades.</div>
+          </div>
+          <div class="panel card">
+            <div class="shop-header">
+              <button id="refresh-shop">Refresh Wares</button>
+              <div id="shop-timer" class="small"></div>
+            </div>
+            <div id="shop-list" class="shop-grid"></div>
+          </div>
+        </section>
+
+        <section id="settings-panel" class="main-panel">
+          <div class="view-header">
+            <div class="section-title">Settings &amp; QoL</div>
+            <div class="section-sub">Tweak your dashboard visuals and filters.</div>
+          </div>
+          <div class="panel card settings-grid">
+            <div class="setting-card" data-setting="ui-scale">
+              <div class="setting-title-row">
+                <div class="setting-title">UI Scale</div>
+                <div class="setting-value" data-setting-value="ui-scale"></div>
+              </div>
+              <p class="muted">Use browser zoom or adjust CSS variables to resize.</p>
+            </div>
+            <div class="setting-card" data-setting="animations">
+              <div class="setting-title-row">
+                <div class="setting-title">Animations</div>
+                <div class="setting-value" data-setting-value="animations"></div>
+              </div>
+              <p class="muted">Bars and buttons use smooth transitions; disable with reduced motion.</p>
+            </div>
+            <div class="setting-card" data-setting="loot-filters">
+              <div class="setting-title-row">
+                <div class="setting-title">Loot Filters</div>
+                <div class="setting-value" data-setting-value="loot-filters"></div>
+              </div>
+              <p class="muted">Use inventory filters and Sell All to declutter drops.</p>
+            </div>
+            <div class="setting-card" data-setting="colorblind-mode">
+              <div class="setting-title-row">
+                <div class="setting-title">Colorblind Mode</div>
+                <div class="setting-value" data-setting-value="colorblind-mode"></div>
+              </div>
+              <p class="muted">Rarity colors favor strong contrast with text labels.</p>
+            </div>
+            <div class="setting-card" data-setting="mobile-layout">
+              <div class="setting-title-row">
+                <div class="setting-title">Mobile Layout Mode</div>
+                <div class="setting-value" data-setting-value="mobile-layout"></div>
+              </div>
+              <p class="muted">Optimizes layout for phones (stacked panels, bigger buttons).</p>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+  <div id="gear-tooltip" class="gear-tooltip" hidden></div>
+  <div id="combat-action-bar" class="combat-action-bar" hidden>
+    <div id="combat-action-track" class="combat-action-track"></div>
+  </div>
+  <script src="./game.js"></script>
+</body>
+</html>
